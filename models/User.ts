@@ -16,7 +16,7 @@ const UserSchema = new mongoose.Schema(
     },
     segundoApell: {
       type: String,
-      default: "",
+      required: true,
     },
     numTel: {
       type: String,
@@ -31,6 +31,11 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    estado: {
+      type: Boolean,
+      required: true,
+      default: true,
+    },
     idRol: {
       type: Number,
       required: true,
@@ -38,8 +43,9 @@ const UserSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
     _id: false,
+    versionKey: false,
+    timestamps: false,
   },
 )
 

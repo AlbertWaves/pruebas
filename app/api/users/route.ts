@@ -33,10 +33,12 @@ export async function POST(request: NextRequest) {
     const newUser = new User({
       _id: nextId,
       ...userData,
+      estado: true, // Por defecto activo
     })
 
     await newUser.save()
 
+    // Retornar sin contraseña
     const { contrasena, ...userWithoutPassword } = newUser.toObject()
     return NextResponse.json(userWithoutPassword, { status: 201 })
   } catch (error) {

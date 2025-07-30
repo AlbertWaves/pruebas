@@ -29,8 +29,8 @@ interface User {
   segundoApell: string
   numTel: string
   correo: string
+  estado: boolean
   idRol: number
-  fechaCreacion?: string
 }
 
 interface Role {
@@ -57,6 +57,8 @@ export default function UsersPage() {
     contrasena: "",
     idRol: 2,
   })
+
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     loadUsers()
@@ -89,6 +91,57 @@ export default function UsersPage() {
     }
   }
 
+  // Validaciones
+  const validateName = (name: string) => {
+    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/
+    return nameRegex.test(name) && name.trim().length >= 2
+  }
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const validatePhone = (phone: string) => {
+    const phoneRegex = /^[0-9+\-\s()]+$/
+    return phoneRegex.test(phone) && phone.replace(/\D/g, "").length >= 10
+  }
+
+  const validatePassword = (password: string) => {
+    return password.length >= 6
+  }
+
+  const validateForm = (userData: any) => {
+    const newErrors: Record<string, string> = {}
+
+    if (!validateName(userData.nombre)) {
+      newErrors.nombre = "El nombre debe contener solo letras y tener al menos 2 caracteres"
+    }
+
+    if (!validateName(userData.primerApell)) {
+      newErrors.primerApell = "El apellido debe contener solo letras y tener al menos 2 caracteres"
+    }
+
+    if (userData.segundoApell && !validateName(userData.segundoApell)) {
+      newErrors.segundoApell = "El segundo apellido debe contener solo letras"
+    }
+
+    if (!validateEmail(userData.correo)) {
+      newErrors.correo = "Ingrese un correo electrónico válido"
+    }
+
+    if (!validatePhone(userData.numTel)) {
+      newErrors.numTel = "Ingrese un número de teléfono válido (mínimo 10 dígitos)"
+    }
+
+    if (userData.contrasena && !validatePassword(userData.contrasena)) {
+      newErrors.contrasena = "La contraseña debe tener al menos 6 caracteres"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -102,17 +155,22 @@ export default function UsersPage() {
 
   const getUserStats = () => {
     const total = users.length
+    const active = users.filter((u) => u.estado).length
+    const inactive = users.filter((u) => !u.estado).length
     const admins = users.filter((u) => u.idRol === 1).length
     const regularUsers = users.filter((u) => u.idRol === 2).length
-    const inactive = 0 // Por ahora no hay usuarios inactivos
 
-    return { total, admins, regularUsers, inactive }
+    return { total, active, inactive, admins, regularUsers }
   }
 
   const stats = getUserStats()
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!validateForm(newUser)) {
+      return
+    }
 
     try {
       const response = await fetch("/api/users", {
@@ -133,6 +191,7 @@ export default function UsersPage() {
           contrasena: "",
           idRol: 2,
         })
+        setErrors({})
         setIsCreateDialogOpen(false)
         alert("Usuario creado exitosamente")
       } else {
@@ -147,12 +206,17 @@ export default function UsersPage() {
 
   const handleEditUser = (user: User) => {
     setEditingUser(user)
+    setErrors({})
     setIsEditDialogOpen(true)
   }
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingUser) return
+
+    if (!validateForm(editingUser)) {
+      return
+    }
 
     try {
       const response = await fetch(`/api/users/${editingUser._id}`, {
@@ -166,6 +230,7 @@ export default function UsersPage() {
         setUsers((prev) => prev.map((u) => (u._id === editingUser._id ? updatedUser : u)))
         setIsEditDialogOpen(false)
         setEditingUser(null)
+        setErrors({})
         alert("Usuario actualizado exitosamente")
       } else {
         const errorData = await response.json()
@@ -207,6 +272,16 @@ export default function UsersPage() {
     return idRol === 1 ? "default" : "secondary"
   }
 
+  const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^0-9+\-\s()]/g, "")
+    return value
+  }
+
+  const handleNameInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "")
+    return value
+  }
+
   if (loading) {
     return <div>Cargando...</div>
   }
@@ -235,25 +310,35 @@ export default function UsersPage() {
             </DialogHeader>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="nombre">Nombre</Label>
+                <Label htmlFor="nombre">Nombre *</Label>
                 <Input
                   id="nombre"
                   placeholder="Ingresa el nombre"
                   value={newUser.nombre}
-                  onChange={(e) => setNewUser((prev) => ({ ...prev, nombre: e.target.value }))}
+                  onChange={(e) => {
+                    const value = handleNameInput(e)
+                    setNewUser((prev) => ({ ...prev, nombre: value }))
+                  }}
+                  className={errors.nombre ? "border-red-500" : ""}
                   required
                 />
+                {errors.nombre && <p className="text-sm text-red-500">{errors.nombre}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="primerApell">Primer Apellido</Label>
+                <Label htmlFor="primerApell">Primer Apellido *</Label>
                 <Input
                   id="primerApell"
                   placeholder="Ingresa el primer apellido"
                   value={newUser.primerApell}
-                  onChange={(e) => setNewUser((prev) => ({ ...prev, primerApell: e.target.value }))}
+                  onChange={(e) => {
+                    const value = handleNameInput(e)
+                    setNewUser((prev) => ({ ...prev, primerApell: value }))
+                  }}
+                  className={errors.primerApell ? "border-red-500" : ""}
                   required
                 />
+                {errors.primerApell && <p className="text-sm text-red-500">{errors.primerApell}</p>}
               </div>
 
               <div className="space-y-2">
@@ -262,47 +347,61 @@ export default function UsersPage() {
                   id="segundoApell"
                   placeholder="Ingresa el segundo apellido (opcional)"
                   value={newUser.segundoApell}
-                  onChange={(e) => setNewUser((prev) => ({ ...prev, segundoApell: e.target.value }))}
+                  onChange={(e) => {
+                    const value = handleNameInput(e)
+                    setNewUser((prev) => ({ ...prev, segundoApell: value }))
+                  }}
+                  className={errors.segundoApell ? "border-red-500" : ""}
                 />
+                {errors.segundoApell && <p className="text-sm text-red-500">{errors.segundoApell}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="correo">Correo Electrónico</Label>
+                <Label htmlFor="correo">Correo Electrónico *</Label>
                 <Input
                   id="correo"
                   type="email"
                   placeholder="Ingresa el correo electrónico"
                   value={newUser.correo}
                   onChange={(e) => setNewUser((prev) => ({ ...prev, correo: e.target.value }))}
+                  className={errors.correo ? "border-red-500" : ""}
                   required
                 />
+                {errors.correo && <p className="text-sm text-red-500">{errors.correo}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="telefono">Número de Teléfono</Label>
+                <Label htmlFor="telefono">Número de Teléfono *</Label>
                 <Input
                   id="telefono"
                   placeholder="Ingresa el número de teléfono"
                   value={newUser.numTel}
-                  onChange={(e) => setNewUser((prev) => ({ ...prev, numTel: e.target.value }))}
+                  onChange={(e) => {
+                    const value = handlePhoneInput(e)
+                    setNewUser((prev) => ({ ...prev, numTel: value }))
+                  }}
+                  className={errors.numTel ? "border-red-500" : ""}
                   required
                 />
+                {errors.numTel && <p className="text-sm text-red-500">{errors.numTel}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contrasena">Contraseña</Label>
+                <Label htmlFor="contrasena">Contraseña *</Label>
                 <Input
                   id="contrasena"
                   type="password"
-                  placeholder="Ingresa la contraseña"
+                  placeholder="Ingresa la contraseña (mínimo 6 caracteres)"
                   value={newUser.contrasena}
                   onChange={(e) => setNewUser((prev) => ({ ...prev, contrasena: e.target.value }))}
+                  className={errors.contrasena ? "border-red-500" : ""}
                   required
                 />
+                {errors.contrasena && <p className="text-sm text-red-500">{errors.contrasena}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="rol">Rol</Label>
+                <Label htmlFor="rol">Rol *</Label>
                 <Select
                   value={newUser.idRol.toString()}
                   onValueChange={(value) => setNewUser((prev) => ({ ...prev, idRol: Number(value) }))}
@@ -334,7 +433,7 @@ export default function UsersPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
@@ -347,11 +446,21 @@ export default function UsersPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuarios Regulares</CardTitle>
+            <CardTitle className="text-sm font-medium">Activos</CardTitle>
             <Users className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.regularUsers}</div>
+            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inactivos</CardTitle>
+            <Users className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{stats.inactive}</div>
           </CardContent>
         </Card>
 
@@ -367,11 +476,11 @@ export default function UsersPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactivos</CardTitle>
+            <CardTitle className="text-sm font-medium">Usuarios Regulares</CardTitle>
             <Users className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{stats.inactive}</div>
+            <div className="text-2xl font-bold text-gray-600">{stats.regularUsers}</div>
           </CardContent>
         </Card>
       </div>
@@ -429,6 +538,7 @@ export default function UsersPage() {
               <TableRow>
                 <TableHead>Usuario</TableHead>
                 <TableHead>Contacto</TableHead>
+                <TableHead>Estado</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
@@ -456,6 +566,11 @@ export default function UsersPage() {
                       <p className="text-sm">{user.correo}</p>
                       <p className="text-sm text-gray-500">{user.numTel}</p>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={user.estado ? "default" : "destructive"}>
+                      {user.estado ? "Activo" : "Inactivo"}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -501,23 +616,33 @@ export default function UsersPage() {
           {editingUser && (
             <form onSubmit={handleUpdateUser} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="editNombre">Nombre</Label>
+                <Label htmlFor="editNombre">Nombre *</Label>
                 <Input
                   id="editNombre"
                   value={editingUser.nombre}
-                  onChange={(e) => setEditingUser((prev) => (prev ? { ...prev, nombre: e.target.value } : null))}
+                  onChange={(e) => {
+                    const value = handleNameInput(e)
+                    setEditingUser((prev) => (prev ? { ...prev, nombre: value } : null))
+                  }}
+                  className={errors.nombre ? "border-red-500" : ""}
                   required
                 />
+                {errors.nombre && <p className="text-sm text-red-500">{errors.nombre}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="editPrimerApell">Primer Apellido</Label>
+                <Label htmlFor="editPrimerApell">Primer Apellido *</Label>
                 <Input
                   id="editPrimerApell"
                   value={editingUser.primerApell}
-                  onChange={(e) => setEditingUser((prev) => (prev ? { ...prev, primerApell: e.target.value } : null))}
+                  onChange={(e) => {
+                    const value = handleNameInput(e)
+                    setEditingUser((prev) => (prev ? { ...prev, primerApell: value } : null))
+                  }}
+                  className={errors.primerApell ? "border-red-500" : ""}
                   required
                 />
+                {errors.primerApell && <p className="text-sm text-red-500">{errors.primerApell}</p>}
               </div>
 
               <div className="space-y-2">
@@ -525,33 +650,63 @@ export default function UsersPage() {
                 <Input
                   id="editSegundoApell"
                   value={editingUser.segundoApell}
-                  onChange={(e) => setEditingUser((prev) => (prev ? { ...prev, segundoApell: e.target.value } : null))}
+                  onChange={(e) => {
+                    const value = handleNameInput(e)
+                    setEditingUser((prev) => (prev ? { ...prev, segundoApell: value } : null))
+                  }}
+                  className={errors.segundoApell ? "border-red-500" : ""}
                 />
+                {errors.segundoApell && <p className="text-sm text-red-500">{errors.segundoApell}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="editCorreo">Correo Electrónico</Label>
+                <Label htmlFor="editCorreo">Correo Electrónico *</Label>
                 <Input
                   id="editCorreo"
                   type="email"
                   value={editingUser.correo}
                   onChange={(e) => setEditingUser((prev) => (prev ? { ...prev, correo: e.target.value } : null))}
+                  className={errors.correo ? "border-red-500" : ""}
                   required
                 />
+                {errors.correo && <p className="text-sm text-red-500">{errors.correo}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="editTelefono">Número de Teléfono</Label>
+                <Label htmlFor="editTelefono">Número de Teléfono *</Label>
                 <Input
                   id="editTelefono"
                   value={editingUser.numTel}
-                  onChange={(e) => setEditingUser((prev) => (prev ? { ...prev, numTel: e.target.value } : null))}
+                  onChange={(e) => {
+                    const value = handlePhoneInput(e)
+                    setEditingUser((prev) => (prev ? { ...prev, numTel: value } : null))
+                  }}
+                  className={errors.numTel ? "border-red-500" : ""}
                   required
                 />
+                {errors.numTel && <p className="text-sm text-red-500">{errors.numTel}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="editRol">Rol</Label>
+                <Label htmlFor="editEstado">Estado</Label>
+                <Select
+                  value={editingUser.estado.toString()}
+                  onValueChange={(value) =>
+                    setEditingUser((prev) => (prev ? { ...prev, estado: value === "true" } : null))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Activo</SelectItem>
+                    <SelectItem value="false">Inactivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editRol">Rol *</Label>
                 <Select
                   value={editingUser.idRol.toString()}
                   onValueChange={(value) => setEditingUser((prev) => (prev ? { ...prev, idRol: Number(value) } : null))}

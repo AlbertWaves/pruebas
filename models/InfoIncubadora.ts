@@ -6,27 +6,32 @@ const InfoIncubadoraSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    humedActual: {
+    temperActual: {
       type: Number,
       required: true,
     },
-    idEdoSensores: {
+    humedActual: {
       type: Number,
       required: true,
-      ref: "EdoSensores",
     },
     idIncubadora: {
       type: Number,
       required: true,
       ref: "Incubadora",
     },
-    temperActual: {
-      type: Number,
+    idSensores: {
+      type: [Number],
+      required: true,
+    },
+    idActivadores: {
+      type: [Number],
       required: true,
     },
   },
   {
     _id: false,
+    versionKey: false,
+    timestamps: false,
   },
 )
 

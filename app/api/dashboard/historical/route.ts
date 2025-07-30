@@ -1,9 +1,11 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import connectDB from "@/lib/mongodb"
 import HistorialTemp from "@/models/HistorialTemp"
 import HistorialHum from "@/models/HistorialHum"
 
-export async function GET(request: NextRequest) {
+export const dynamic = "force-dynamic"
+
+export async function GET(request: Request) {
   try {
     await connectDB()
 

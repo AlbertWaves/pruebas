@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Switch } from "@/components/ui/switch"
-import { Thermometer, Droplets, RefreshCw, TrendingUp, Clock, Download } from "lucide-react"
+import { Thermometer, Droplets, RefreshCw, TrendingUp, Clock, Download, Cpu, Zap } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 interface SensorData {
@@ -30,6 +30,14 @@ interface HistoricalData {
   humedad: number
 }
 
+interface SensorStatus {
+  edoDht11A: boolean
+  edoDht11B: boolean
+  edoCalefactor: boolean
+  edoHumificador: boolean
+  edoVentilador: boolean
+}
+
 export default function Dashboard() {
   const [sensorData, setSensorData] = useState<SensorData>({
     temperatura: 0,
@@ -48,12 +56,12 @@ export default function Dashboard() {
   const [isCelsius, setIsCelsius] = useState(true)
   const [timeRange, setTimeRange] = useState("24h")
   const [historicalData, setHistoricalData] = useState<HistoricalData[]>([])
-  const [sensorStatus, setSensorStatus] = useState({
-    dht11A: true,
-    dht11B: true,
-    calefactor: false,
-    humificador: false,
-    ventilador: false,
+  const [sensorStatus, setSensorStatus] = useState<SensorStatus>({
+    edoDht11A: true,
+    edoDht11B: true,
+    edoCalefactor: false,
+    edoHumificador: false,
+    edoVentilador: false,
   })
 
   // Cargar datos iniciales
@@ -125,13 +133,7 @@ export default function Dashboard() {
       const response = await fetch("/api/dashboard/sensors")
       if (response.ok) {
         const data = await response.json()
-        setSensorStatus({
-          dht11A: data.edoDht11A,
-          dht11B: data.edoDht11B,
-          calefactor: data.edoCalefactor,
-          humificador: data.edoHumificador,
-          ventilador: data.edoVentilador,
-        })
+        setSensorStatus(data)
       }
     } catch (error) {
       console.error("Error loading sensor status:", error)
@@ -163,12 +165,21 @@ export default function Dashboard() {
     return sensorData.humedad >= optimalRange.humedadMin && sensorData.humedad <= optimalRange.humedadMax
   }
 
+  // Separar sensores de actuadores
   const getActiveSensorsCount = () => {
-    return Object.values(sensorStatus).filter(Boolean).length
+    return [sensorStatus.edoDht11A, sensorStatus.edoDht11B].filter(Boolean).length
   }
 
   const getTotalSensorsCount = () => {
-    return Object.keys(sensorStatus).length
+    return 2 // Solo DHT11A y DHT11B son sensores
+  }
+
+  const getActiveActuatorsCount = () => {
+    return [sensorStatus.edoCalefactor, sensorStatus.edoHumificador, sensorStatus.edoVentilador].filter(Boolean).length
+  }
+
+  const getTotalActuatorsCount = () => {
+    return 3 // Calefactor, Humificador y Ventilador son actuadores
   }
 
   return (
@@ -204,10 +215,21 @@ export default function Dashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {getActiveSensorsCount()}/{getTotalSensorsCount()} Sensores
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Cpu className="h-4 w-4 text-blue-500" />
+                <div className="text-lg font-bold text-blue-600">
+                  {getActiveSensorsCount()}/{getTotalSensorsCount()} Sensores
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Zap className="h-4 w-4 text-orange-500" />
+                <div className="text-lg font-bold text-orange-600">
+                  {getActiveActuatorsCount()}/{getTotalActuatorsCount()} Actuadores
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">Sistemas operativos</p>
+            <p className="text-xs text-muted-foreground mt-2">Sistemas operativos</p>
           </CardContent>
         </Card>
 
