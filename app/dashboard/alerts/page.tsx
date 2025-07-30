@@ -5,66 +5,46 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Clock, Settings, Bell, RotateCcw, Save } from "lucide-react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
+import { AlertTriangle, Bell, Settings, History, Thermometer, Droplets } from "lucide-react"
+
+interface Alert {
+  _id: string
+  tipo: string
+  mensaje: string
+  timestamp: string
+  activa: boolean
+  valor: number
+}
 
 interface AlertConfig {
   tempMin: number
   tempMax: number
   humedadMin: number
   humedadMax: number
-}
-
-interface Alert {
-  _id: string
-  fechaRegistro: string
-  idActuador: number
-  nombreActuador: string
-  tipo: "critical" | "warning"
-  mensaje: string
+  notificacionesActivas: boolean
 }
 
 export default function AlertsPage() {
-  const [config, setConfig] = useState<AlertConfig>({
+  const [activeAlerts, setActiveAlerts] = useState<Alert[]>([])
+  const [alertHistory, setAlertHistory] = useState<Alert[]>([])
+  const [alertConfig, setAlertConfig] = useState<AlertConfig>({
     tempMin: 26,
     tempMax: 29,
     humedadMin: 60,
     humedadMax: 80,
+    notificacionesActivas: true,
   })
-
-  const [globalNotifications, setGlobalNotifications] = useState(true)
-  const [tempNotifications, setTempNotifications] = useState(true)
-  const [humedadNotifications, setHumedadNotifications] = useState(true)
-  const [activeAlerts, setActiveAlerts] = useState<Alert[]>([])
-  const [alertHistory, setAlertHistory] = useState<Alert[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    loadConfig()
     loadActiveAlerts()
     loadAlertHistory()
+    loadAlertConfig()
   }, [])
-
-  const loadConfig = async () => {
-    try {
-      const response = await fetch("/api/alerts/config")
-      if (response.ok) {
-        const data = await response.json()
-        setConfig({
-          tempMin: data.tempMin,
-          tempMax: data.tempMax,
-          humedadMin: data.humedadMin,
-          humedadMax: data.humedadMax,
-        })
-      }
-    } catch (error) {
-      console.error("Error loading config:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const loadActiveAlerts = async () => {
     try {
@@ -87,267 +67,163 @@ export default function AlertsPage() {
       }
     } catch (error) {
       console.error("Error loading alert history:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleSaveConfig = async () => {
+  const loadAlertConfig = async () => {
+    try {
+      const response = await fetch("/api/alerts/config")
+      if (response.ok) {
+        const data = await response.json()
+        setAlertConfig(data)
+      }
+    } catch (error) {
+      console.error("Error loading alert config:", error)
+    }
+  }
+
+  const saveAlertConfig = async () => {
     try {
       const response = await fetch("/api/alerts/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
+        body: JSON.stringify(alertConfig),
       })
 
       if (response.ok) {
-        alert("Configuración guardada exitosamente")
-      } else {
-        alert("Error al guardar la configuración")
+        // Mostrar mensaje de éxito
+        console.log("Configuración guardada exitosamente")
       }
     } catch (error) {
-      console.error("Error al guardar configuración:", error)
-      alert("Error al guardar la configuración")
+      console.error("Error saving alert config:", error)
     }
   }
 
-  const handleResetConfig = () => {
-    setConfig({
-      tempMin: 26,
-      tempMax: 29,
-      humedadMin: 60,
-      humedadMax: 80,
-    })
+  const getAlertIcon = (tipo: string) => {
+    switch (tipo) {
+      case "temperatura":
+        return <Thermometer className="w-4 h-4" />
+      case "humedad":
+        return <Droplets className="w-4 h-4" />
+      default:
+        return <AlertTriangle className="w-4 h-4" />
+    }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString("es-ES")
+  const getAlertColor = (tipo: string) => {
+    switch (tipo) {
+      case "temperatura":
+        return "text-red-600 bg-red-50 border-red-200"
+      case "humedad":
+        return "text-blue-600 bg-blue-50 border-blue-200"
+      default:
+        return "text-yellow-600 bg-yellow-50 border-yellow-200"
+    }
   }
 
-  if (loading) {
-    return <div>Cargando...</div>
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-green-700 font-medium">Cargando alertas...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Sistema de Alertas</h1>
-          <p className="text-gray-600">Configuración de umbrales y gestión de notificaciones</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Notificaciones Globales</span>
-            <Switch checked={globalNotifications} onCheckedChange={setGlobalNotifications} />
-          </div>
-          <Bell className="w-5 h-5 text-gray-600" />
+          <h1 className="text-4xl font-bold text-green-800">Sistema de Alertas</h1>
+          <p className="text-gray-600 mt-2 text-lg">Monitorea y configura las alertas del sistema</p>
         </div>
       </div>
 
-      {/* Alert Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="bg-white border-red-200 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas Críticas</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-700">Alertas Activas</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {activeAlerts.filter((alert) => alert.tipo === "critical").length}
-            </div>
+            <div className="text-2xl font-bold text-red-800">{activeAlerts.length}</div>
+            <p className="text-xs text-red-600 mt-1">Requieren atención</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-white border-green-200 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas Activas</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
+            <CardTitle className="text-sm font-medium text-green-700">Notificaciones</CardTitle>
+            <Bell className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{activeAlerts.length}</div>
+            <div className="text-2xl font-bold text-green-800">{alertConfig.notificacionesActivas ? "ON" : "OFF"}</div>
+            <p className="text-xs text-green-600 mt-1">Estado del sistema</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-white border-blue-200 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Alertas</CardTitle>
-            <Bell className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium text-blue-700">Historial</CardTitle>
+            <History className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{alertHistory.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Configuraciones</CardTitle>
-            <Settings className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">2</div>
+            <div className="text-2xl font-bold text-blue-800">{alertHistory.length}</div>
+            <p className="text-xs text-blue-600 mt-1">Alertas registradas</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content */}
-      <Tabs defaultValue="configuracion" className="w-full">
-        <TabsList>
-          <TabsTrigger value="configuracion">Configuración de Umbrales</TabsTrigger>
-          <TabsTrigger value="activas">Alertas Activas</TabsTrigger>
-          <TabsTrigger value="historial">Historial</TabsTrigger>
+      <Tabs defaultValue="active" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-green-50">
+          <TabsTrigger value="active" className="data-[state=active]:bg-white data-[state=active]:text-green-700">
+            Alertas Activas
+          </TabsTrigger>
+          <TabsTrigger value="config" className="data-[state=active]:bg-white data-[state=active]:text-green-700">
+            Configuración
+          </TabsTrigger>
+          <TabsTrigger value="history" className="data-[state=active]:bg-white data-[state=active]:text-green-700">
+            Historial
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="configuracion" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuración de Umbrales</CardTitle>
-              <CardDescription>Define los rangos aceptables para cada parámetro ambiental</CardDescription>
+        <TabsContent value="active" className="mt-6">
+          <Card className="shadow-xl border-green-200 bg-white">
+            <CardHeader className="bg-green-600 text-white">
+              <CardTitle className="text-xl">Alertas Activas</CardTitle>
+              <CardDescription className="text-green-100">Alertas que requieren atención inmediata</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Temperature Configuration */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-                    <h3 className="text-lg font-semibold">Temperatura</h3>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-600">Notificaciones</span>
-                      <Switch checked={tempNotifications} onCheckedChange={setTempNotifications} />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-600">Activo</span>
-                      <Switch checked={true} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tempMin">Valor Mínimo (°C)</Label>
-                    <Input
-                      id="tempMin"
-                      type="number"
-                      value={config.tempMin}
-                      onChange={(e) => setConfig((prev) => ({ ...prev, tempMin: Number(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tempMax">Valor Máximo (°C)</Label>
-                    <Input
-                      id="tempMax"
-                      type="number"
-                      value={config.tempMax}
-                      onChange={(e) => setConfig((prev) => ({ ...prev, tempMax: Number(e.target.value) }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch checked={tempNotifications} onCheckedChange={setTempNotifications} />
-                  <span className="text-sm text-gray-600">Enviar notificaciones para este parámetro</span>
-                </div>
-              </div>
-
-              {/* Humidity Configuration */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                    <h3 className="text-lg font-semibold">Humedad</h3>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-600">Notificaciones</span>
-                      <Switch checked={humedadNotifications} onCheckedChange={setHumedadNotifications} />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-600">Activo</span>
-                      <Switch checked={true} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="humedadMin">Valor Mínimo</Label>
-                    <div className="relative">
-                      <Input
-                        id="humedadMin"
-                        type="number"
-                        value={config.humedadMin}
-                        onChange={(e) => setConfig((prev) => ({ ...prev, humedadMin: Number(e.target.value) }))}
-                      />
-                      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="humedadMax">Valor Máximo</Label>
-                    <div className="relative">
-                      <Input
-                        id="humedadMax"
-                        type="number"
-                        value={config.humedadMax}
-                        onChange={(e) => setConfig((prev) => ({ ...prev, humedadMax: Number(e.target.value) }))}
-                      />
-                      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch checked={humedadNotifications} onCheckedChange={setHumedadNotifications} />
-                  <span className="text-sm text-gray-600">Enviar notificaciones para este parámetro</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-between pt-6">
-                <Button variant="outline" onClick={handleResetConfig}>
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Restablecer
-                </Button>
-                <Button onClick={handleSaveConfig} className="bg-green-600 hover:bg-green-700">
-                  <Save className="w-4 h-4 mr-2" />
-                  Guardar Cambios
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="activas" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Alertas Activas</CardTitle>
-              <CardDescription>Alertas que requieren atención inmediata</CardDescription>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {activeAlerts.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No hay alertas activas</p>
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Bell className="w-8 h-8 text-green-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay alertas activas</h3>
+                  <p className="text-gray-600">Todos los parámetros están dentro de los rangos normales</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {activeAlerts.map((alert) => (
-                    <div key={alert._id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div
-                          className={`w-3 h-3 rounded-full ${
-                            alert.tipo === "critical" ? "bg-red-500" : "bg-yellow-500"
-                          }`}
-                        />
-                        <div>
-                          <p className="font-medium">{alert.mensaje}</p>
-                          <p className="text-sm text-gray-500">
-                            {formatDate(alert.fechaRegistro)} - {alert.nombreActuador}
-                          </p>
+                    <div key={alert._id} className={`p-4 rounded-lg border ${getAlertColor(alert.tipo)}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          {getAlertIcon(alert.tipo)}
+                          <div>
+                            <h4 className="font-semibold capitalize">{alert.tipo}</h4>
+                            <p className="text-sm">{alert.mensaje}</p>
+                            <p className="text-xs mt-1 opacity-75">Valor actual: {alert.valor}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={alert.tipo === "critical" ? "destructive" : "secondary"}>
-                          {alert.tipo === "critical" ? "Crítica" : "Advertencia"}
+                        <Badge variant="destructive" className="ml-4">
+                          Activa
                         </Badge>
                       </div>
                     </div>
@@ -358,32 +234,158 @@ export default function AlertsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="historial" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Historial de Alertas</CardTitle>
-              <CardDescription>Últimas alertas generadas por el sistema</CardDescription>
+        <TabsContent value="config" className="mt-6">
+          <Card className="shadow-xl border-green-200 bg-white">
+            <CardHeader className="bg-green-600 text-white">
+              <CardTitle className="text-xl">Configuración de Alertas</CardTitle>
+              <CardDescription className="text-green-100">
+                Define los rangos óptimos para temperatura y humedad
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {alertHistory.map((alert) => (
-                  <div key={alert._id} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
-                    <div className="flex items-center space-x-4">
-                      <div
-                        className={`w-3 h-3 rounded-full ${alert.tipo === "critical" ? "bg-red-500" : "bg-yellow-500"}`}
-                      />
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                  <div>
+                    <h3 className="font-semibold text-green-800">Notificaciones</h3>
+                    <p className="text-sm text-green-600">Activar/desactivar alertas del sistema</p>
+                  </div>
+                  <Switch
+                    checked={alertConfig.notificacionesActivas}
+                    onCheckedChange={(checked) => setAlertConfig({ ...alertConfig, notificacionesActivas: checked })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-green-800 flex items-center space-x-2">
+                      <Thermometer className="w-5 h-5" />
+                      <span>Temperatura (°C)</span>
+                    </h3>
+                    <div className="space-y-3">
                       <div>
-                        <p className="font-medium">{alert.mensaje}</p>
-                        <p className="text-sm text-gray-500">
-                          {formatDate(alert.fechaRegistro)} - {alert.nombreActuador}
-                        </p>
+                        <Label htmlFor="tempMin" className="text-green-700">
+                          Mínima
+                        </Label>
+                        <Input
+                          id="tempMin"
+                          type="number"
+                          value={alertConfig.tempMin}
+                          onChange={(e) =>
+                            setAlertConfig({ ...alertConfig, tempMin: Number.parseFloat(e.target.value) })
+                          }
+                          className="border-green-200 focus:border-green-500"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="tempMax" className="text-green-700">
+                          Máxima
+                        </Label>
+                        <Input
+                          id="tempMax"
+                          type="number"
+                          value={alertConfig.tempMax}
+                          onChange={(e) =>
+                            setAlertConfig({ ...alertConfig, tempMax: Number.parseFloat(e.target.value) })
+                          }
+                          className="border-green-200 focus:border-green-500"
+                        />
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">{alert.tipo === "critical" ? "Crítica" : "Advertencia"}</Badge>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-green-800 flex items-center space-x-2">
+                      <Droplets className="w-5 h-5" />
+                      <span>Humedad (%)</span>
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="humedadMin" className="text-green-700">
+                          Mínima
+                        </Label>
+                        <Input
+                          id="humedadMin"
+                          type="number"
+                          value={alertConfig.humedadMin}
+                          onChange={(e) =>
+                            setAlertConfig({ ...alertConfig, humedadMin: Number.parseFloat(e.target.value) })
+                          }
+                          className="border-green-200 focus:border-green-500"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="humedadMax" className="text-green-700">
+                          Máxima
+                        </Label>
+                        <Input
+                          id="humedadMax"
+                          type="number"
+                          value={alertConfig.humedadMax}
+                          onChange={(e) =>
+                            setAlertConfig({ ...alertConfig, humedadMax: Number.parseFloat(e.target.value) })
+                          }
+                          className="border-green-200 focus:border-green-500"
+                        />
+                      </div>
                     </div>
                   </div>
-                ))}
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <Button onClick={saveAlertConfig} className="bg-green-600 hover:bg-green-700 text-white">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Guardar Configuración
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-6">
+          <Card className="shadow-xl border-green-200 bg-white">
+            <CardHeader className="bg-green-600 text-white">
+              <CardTitle className="text-xl">Historial de Alertas</CardTitle>
+              <CardDescription className="text-green-100">
+                Registro completo de todas las alertas del sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-green-50">
+                      <TableHead className="font-semibold text-green-700">Tipo</TableHead>
+                      <TableHead className="font-semibold text-green-700">Mensaje</TableHead>
+                      <TableHead className="font-semibold text-green-700">Valor</TableHead>
+                      <TableHead className="font-semibold text-green-700">Fecha</TableHead>
+                      <TableHead className="font-semibold text-green-700">Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {alertHistory.map((alert) => (
+                      <TableRow key={alert._id} className="hover:bg-green-50">
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {getAlertIcon(alert.tipo)}
+                            <span className="capitalize font-medium">{alert.tipo}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{alert.mensaje}</TableCell>
+                        <TableCell className="font-semibold">{alert.valor}</TableCell>
+                        <TableCell>{new Date(alert.timestamp).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={alert.activa ? "destructive" : "secondary"}
+                            className={alert.activa ? "" : "bg-green-100 text-green-800"}
+                          >
+                            {alert.activa ? "Activa" : "Resuelta"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
