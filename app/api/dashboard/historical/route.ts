@@ -9,37 +9,42 @@ export async function GET(request: Request) {
   try {
     await connectDB()
 
-    const url = new URL(request.url)
-    const range = url.searchParams.get("range") || "24h"
+    const { searchParams } = new URL(request.url)
+    const range = searchParams.get("range") || "24h"
 
+    // Calcular fecha de inicio basada en el rango
+    const now = new Date()
     const startDate = new Date()
 
     switch (range) {
       case "24h":
-        startDate.setHours(startDate.getHours() - 24)
+        startDate.setHours(now.getHours() - 24)
         break
       case "7d":
-        startDate.setDate(startDate.getDate() - 7)
+        startDate.setDate(now.getDate() - 7)
         break
       case "30d":
-        startDate.setDate(startDate.getDate() - 30)
+        startDate.setDate(now.getDate() - 30)
         break
       default:
-        startDate.setHours(startDate.getHours() - 24)
+        startDate.setHours(now.getHours() - 24)
     }
 
     // Obtener datos de temperatura y humedad
     const [tempData, humData] = await Promise.all([
       HistorialTemp.find({
+        idInfoIncubadora: 1,
         fechaRegistro: { $gte: startDate },
       })
         .sort({ fechaRegistro: 1 })
-        .limit(100),
+        .lean(),
+
       HistorialHum.find({
+        idInfoIncubadora: 1,
         fechaRegistro: { $gte: startDate },
       })
         .sort({ fechaRegistro: 1 })
-        .limit(100),
+        .lean(),
     ])
 
     // Combinar datos por timestamp
@@ -50,12 +55,12 @@ export async function GET(request: Request) {
     // Crear mapas por timestamp
     tempData.forEach((item) => {
       const timeKey = new Date(item.fechaRegistro).toISOString().slice(0, 16) // YYYY-MM-DDTHH:MM
-      tempMap.set(timeKey, item.valorTemperatura)
+      tempMap.set(timeKey, item.temperatura)
     })
 
     humData.forEach((item) => {
       const timeKey = new Date(item.fechaRegistro).toISOString().slice(0, 16)
-      humMap.set(timeKey, item.valorHumedad)
+      humMap.set(timeKey, item.humedad)
     })
 
     // Combinar datos
@@ -66,18 +71,13 @@ export async function GET(request: Request) {
       .forEach((timeKey) => {
         const date = new Date(timeKey)
         combinedData.push({
-          time: date.toLocaleTimeString("es-ES", {
-            hour: "2-digit",
-            minute: "2-digit",
-            day: "2-digit",
-            month: "2-digit",
-          }),
+          time: date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }),
           temperatura: tempMap.get(timeKey) || 0,
           humedad: humMap.get(timeKey) || 0,
         })
       })
 
-    return NextResponse.json(combinedData.slice(-50)) // Últimos 50 puntos
+    return NextResponse.json(combinedData.slice(-50)) // Últimos 50 registros
   } catch (error) {
     console.error("Error al obtener datos históricos:", error)
     return NextResponse.json({ error: "Error al obtener datos históricos" }, { status: 500 })

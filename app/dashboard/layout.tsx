@@ -23,8 +23,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Home, Bell, Users, LogOut, ChevronDown } from "lucide-react"
-import Image from "next/image"
+import { Home, Bell, Users, LogOut } from "lucide-react"
 
 interface DashboardUser {
   _id: number
@@ -54,19 +53,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-white flex items-center justify-center">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-green-700 font-medium">Cargando...</span>
-        </div>
-      </div>
-    )
+    return <div>Cargando...</div>
   }
 
   const menuItems = [
     {
-      title: "Dashboard Principal",
+      title: "Hermetia Vitalis",
       url: "/dashboard",
       icon: Home,
     },
@@ -88,34 +80,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SidebarProvider>
-      <Sidebar className="border-r border-green-100 bg-white">
-        <SidebarHeader className="p-6 border-b border-green-100 bg-green-50">
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <Image src="/logo.svg" alt="Hermetia Vitalis" width={40} height={40} className="drop-shadow-sm" />
-              <div className="absolute -inset-1 bg-green-500 rounded-full opacity-10 blur-sm"></div>
+      <Sidebar className="border-r">
+        <SidebarHeader className="p-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+              <div className="w-4 h-4 bg-white rounded-full"></div>
             </div>
-            <div>
-              <span className="font-bold text-lg text-green-800">Hermetia Vitalis</span>
-              <p className="text-xs text-green-600 font-medium">Sistema Inteligente</p>
-            </div>
+            <span className="font-semibold text-green-600">Hermetia Vitalis</span>
           </div>
         </SidebarHeader>
 
-        <SidebarContent className="px-4 bg-white">
+        <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel className="text-green-700 font-semibold mb-2">Navegación</SidebarGroupLabel>
+            <SidebarGroupLabel>Navegación</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
+              <SidebarMenu>
                 {menuItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      className="hover:bg-green-50 hover:text-green-700 rounded-lg transition-all duration-200"
-                    >
-                      <a href={item.url} className="flex items-center space-x-3 p-3">
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-medium">{item.title}</span>
+                    <SidebarMenuButton asChild>
+                      <a href={item.url} className="flex items-center space-x-2">
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
                       </a>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -125,35 +110,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </SidebarGroup>
         </SidebarContent>
 
-        <SidebarFooter className="p-4 border-t border-green-100 bg-green-50">
+        <SidebarFooter className="p-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start p-3 hover:bg-green-100 rounded-lg">
-                <Avatar className="w-10 h-10 mr-3 ring-2 ring-green-200">
-                  <AvatarFallback className="bg-green-100 text-green-700 font-semibold">
+              <Button variant="ghost" className="w-full justify-start">
+                <Avatar className="w-8 h-8 mr-3">
+                  <AvatarFallback className="bg-green-100 text-green-600">
                     {user.nombre.charAt(0)}
                     {user.primerApell.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 text-left">
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="text-sm font-medium">
                     {user.nombre} {user.primerApell}
                   </p>
                   <p className="text-xs text-gray-500">{user.correo}</p>
                 </div>
-                <ChevronDown className="w-4 h-4 text-gray-400" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-white border border-green-100 shadow-xl">
-              <div className="px-3 py-2 border-b border-green-100">
-                <Badge
-                  variant={user.idRol === 1 ? "default" : "secondary"}
-                  className={user.idRol === 1 ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700"}
-                >
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5">
+                <Badge variant={user.idRol === 1 ? "default" : "secondary"} className="text-xs">
                   {user.idRol === 1 ? "Administrador" : "Usuario"}
                 </Badge>
               </div>
-              <DropdownMenuItem onClick={handleLogout} className="text-red-600 hover:bg-red-50 hover:text-red-700">
+              <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Cerrar Sesión
               </DropdownMenuItem>
@@ -162,13 +143,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="bg-gradient-to-br from-gray-50 to-green-50">
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-green-100 px-6 bg-white shadow-sm">
-          <SidebarTrigger className="-ml-1 hover:bg-green-50 rounded-lg" />
-          <div className="flex items-center space-x-2 ml-4">
-            <Image src="/logo.svg" alt="Hermetia Vitalis" width={24} height={24} />
-            <span className="font-semibold text-green-700">Hermetia Vitalis</span>
-          </div>
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
         </header>
         <main className="flex-1 p-6">{children}</main>
       </SidebarInset>
