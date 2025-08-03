@@ -14,10 +14,8 @@ import { Eye, EyeOff, Lock, AlertTriangle, CheckCircle } from "lucide-react"
 export default function ChangePasswordPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -25,7 +23,6 @@ export default function ChangePasswordPage() {
   const [success, setSuccess] = useState("")
 
   const userId = searchParams.get("userId")
-  const isRequired = searchParams.get("required") === "true"
 
   useEffect(() => {
     if (!userId) {
@@ -49,24 +46,19 @@ export default function ChangePasswordPage() {
     setSuccess("")
 
     // Validaciones
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if (!newPassword || !confirmPassword) {
       setError("Todos los campos son requeridos")
       return
     }
 
     if (newPassword !== confirmPassword) {
-      setError("Las contraseñas nuevas no coinciden")
+      setError("Las contraseñas no coinciden")
       return
     }
 
     const passwordError = validatePassword(newPassword)
     if (passwordError) {
       setError(passwordError)
-      return
-    }
-
-    if (currentPassword === newPassword) {
-      setError("La nueva contraseña debe ser diferente a la actual")
       return
     }
 
@@ -80,7 +72,7 @@ export default function ChangePasswordPage() {
         },
         body: JSON.stringify({
           userId: Number.parseInt(userId!),
-          currentPassword,
+          currentPassword: "123456789", // Sabemos que es la contraseña por defecto
           newPassword,
         }),
       })
@@ -103,25 +95,13 @@ export default function ChangePasswordPage() {
     }
   }
 
-  const handleSkip = () => {
-    if (!isRequired) {
-      router.push("/dashboard")
-    }
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <Lock className="mx-auto h-12 w-12 text-green-600" />
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            {isRequired ? "Cambio de Contraseña Requerido" : "Cambiar Contraseña"}
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {isRequired
-              ? "Debes cambiar tu contraseña por defecto para continuar"
-              : "Actualiza tu contraseña por seguridad"}
-          </p>
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Cambio de Contraseña Requerido</h2>
+          <p className="mt-2 text-sm text-gray-600">Debes cambiar tu contraseña por defecto para continuar</p>
         </div>
 
         <Card>
@@ -131,40 +111,14 @@ export default function ChangePasswordPage() {
               <span>Nueva Contraseña</span>
             </CardTitle>
             <CardDescription>
-              {isRequired && (
-                <div className="flex items-center space-x-2 text-amber-600">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span>Este cambio es obligatorio para continuar</span>
-                </div>
-              )}
+              <div className="flex items-center space-x-2 text-amber-600">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Este cambio es obligatorio para continuar</span>
+              </div>
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Contraseña Actual */}
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Contraseña Actual</Label>
-                <div className="relative">
-                  <Input
-                    id="currentPassword"
-                    type={showCurrentPassword ? "text" : "password"}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Ingresa tu contraseña actual"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  >
-                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-
               {/* Nueva Contraseña */}
               <div className="space-y-2">
                 <Label htmlFor="newPassword">Nueva Contraseña</Label>
@@ -229,26 +183,17 @@ export default function ChangePasswordPage() {
                 </Alert>
               )}
 
-              {/* Botones */}
-              <div className="flex space-x-4">
-                <Button type="submit" disabled={loading} className="flex-1 bg-green-600 hover:bg-green-700">
-                  {loading ? "Cambiando..." : "Cambiar Contraseña"}
-                </Button>
-                {!isRequired && (
-                  <Button type="button" variant="outline" onClick={handleSkip} className="flex-1 bg-transparent">
-                    Cancelar
-                  </Button>
-                )}
-              </div>
+              {/* Botón */}
+              <Button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700">
+                {loading ? "Cambiando..." : "Cambiar Contraseña"}
+              </Button>
             </form>
           </CardContent>
         </Card>
 
-        {isRequired && (
-          <div className="text-center">
-            <p className="text-sm text-gray-500">No puedes acceder al sistema hasta cambiar tu contraseña</p>
-          </div>
-        )}
+        <div className="text-center">
+          <p className="text-sm text-gray-500">No puedes acceder al sistema hasta cambiar tu contraseña</p>
+        </div>
       </div>
     </div>
   )

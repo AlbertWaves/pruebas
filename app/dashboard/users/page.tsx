@@ -19,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Users, UserPlus, Search, Filter, MoreHorizontal, Edit, Trash2 } from "lucide-react"
+import { Users, UserPlus, Search, Filter, MoreHorizontal, Edit, Trash2, RotateCcw } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 interface User {
@@ -280,6 +280,30 @@ export default function UsersPage() {
   const handleNameInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "")
     return value
+  }
+
+  const handleResetPassword = async (userId: number) => {
+    if (
+      confirm(
+        "¿Estás seguro de que deseas resetear la contraseña de este usuario? La contraseña será cambiada a '123456789'",
+      )
+    ) {
+      try {
+        const response = await fetch(`/api/users/${userId}/reset-password`, {
+          method: "POST",
+        })
+
+        if (response.ok) {
+          alert("Contraseña reseteada exitosamente. La nueva contraseña es: 123456789")
+        } else {
+          const errorData = await response.json()
+          alert(errorData.error || "Error al resetear la contraseña")
+        }
+      } catch (error) {
+        console.error("Error al resetear contraseña:", error)
+        alert("Error al resetear la contraseña")
+      }
+    }
   }
 
   if (loading) {
@@ -596,6 +620,10 @@ export default function UsersPage() {
                           <Trash2 className="w-4 h-4 mr-2" />
                           Eliminar
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleResetPassword(user._id)} className="text-orange-600">
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                          Resetear Contraseña
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -722,6 +750,16 @@ export default function UsersPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Contraseña</Label>
+                <div className="p-3 bg-gray-50 rounded-md">
+                  <p className="text-sm text-gray-600">
+                    Para cambiar la contraseña, usa la opción "Resetear Contraseña" en el menú de acciones. Esto
+                    establecerá la contraseña por defecto (123456789).
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">

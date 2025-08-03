@@ -23,7 +23,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Home, Bell, Users, LogOut } from "lucide-react"
+import { Home, Bell, Users, LogOut, User } from "lucide-react"
 
 interface DashboardUser {
   _id: number
@@ -134,6 +134,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {user.idRol === 1 ? "Administrador" : "Usuario"}
                 </Badge>
               </div>
+              <DropdownMenuItem asChild>
+                <a href="/dashboard/profile" className="flex items-center">
+                  <User className="w-4 h-4 mr-2" />
+                  Mi Perfil
+                </a>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Cerrar Sesión
