@@ -23,6 +23,7 @@ export default function ChangePasswordPage() {
   const [success, setSuccess] = useState("")
 
   const userId = searchParams.get("userId")
+  const isRequired = searchParams.get("required") === "true"
 
   useEffect(() => {
     if (!userId) {
@@ -37,7 +38,7 @@ export default function ChangePasswordPage() {
     if (password === "123456789") {
       return "No puedes usar la contraseña por defecto"
     }
-    return ""
+    return null
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,19 +47,14 @@ export default function ChangePasswordPage() {
     setSuccess("")
 
     // Validaciones
-    if (!newPassword || !confirmPassword) {
-      setError("Todos los campos son requeridos")
+    const passwordError = validatePassword(newPassword)
+    if (passwordError) {
+      setError(passwordError)
       return
     }
 
     if (newPassword !== confirmPassword) {
       setError("Las contraseñas no coinciden")
-      return
-    }
-
-    const passwordError = validatePassword(newPassword)
-    if (passwordError) {
-      setError(passwordError)
       return
     }
 
@@ -71,16 +67,16 @@ export default function ChangePasswordPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: Number.parseInt(userId!),
-          currentPassword: "123456789", // Sabemos que es la contraseña por defecto
+          userId,
           newPassword,
+          isFirstTime: true,
         }),
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        setSuccess("Contraseña actualizada exitosamente")
+        setSuccess("Contraseña cambiada exitosamente")
         setTimeout(() => {
           router.push("/dashboard")
         }, 2000)
@@ -95,31 +91,44 @@ export default function ChangePasswordPage() {
     }
   }
 
+  if (!userId) {
+    return null
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <Lock className="mx-auto h-12 w-12 text-green-600" />
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Cambio de Contraseña Requerido</h2>
-          <p className="mt-2 text-sm text-gray-600">Debes cambiar tu contraseña por defecto para continuar</p>
+          <div className="flex justify-center">
+            <div className="bg-green-100 p-3 rounded-full">
+              <Lock className="h-12 w-12 text-green-600" />
+            </div>
+          </div>
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+            Cambio de Contraseña {isRequired ? "Requerido" : ""}
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            {isRequired
+              ? "Debes cambiar tu contraseña por defecto para continuar"
+              : "Establece una nueva contraseña para tu cuenta"}
+          </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <CardTitle className="flex items-center gap-2">
               <Lock className="h-5 w-5" />
-              <span>Nueva Contraseña</span>
+              Nueva Contraseña
             </CardTitle>
-            <CardDescription>
-              <div className="flex items-center space-x-2 text-amber-600">
+            {isRequired && (
+              <CardDescription className="text-orange-600 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
-                <span>Este cambio es obligatorio para continuar</span>
-              </div>
-            </CardDescription>
+                Este cambio es obligatorio para continuar
+              </CardDescription>
+            )}
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Nueva Contraseña */}
               <div className="space-y-2">
                 <Label htmlFor="newPassword">Nueva Contraseña</Label>
                 <div className="relative">
@@ -144,7 +153,6 @@ export default function ChangePasswordPage() {
                 <p className="text-xs text-gray-500">Mínimo 8 caracteres, no puede ser la contraseña por defecto</p>
               </div>
 
-              {/* Confirmar Nueva Contraseña */}
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirmar Nueva Contraseña</Label>
                 <div className="relative">
@@ -168,7 +176,6 @@ export default function ChangePasswordPage() {
                 </div>
               </div>
 
-              {/* Mensajes de Error y Éxito */}
               {error && (
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
@@ -183,17 +190,18 @@ export default function ChangePasswordPage() {
                 </Alert>
               )}
 
-              {/* Botón */}
               <Button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700">
-                {loading ? "Cambiando..." : "Cambiar Contraseña"}
+                {loading ? "Cambiando contraseña..." : "Cambiar Contraseña"}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        <div className="text-center">
-          <p className="text-sm text-gray-500">No puedes acceder al sistema hasta cambiar tu contraseña</p>
-        </div>
+        {isRequired && (
+          <div className="text-center">
+            <p className="text-xs text-gray-500">No puedes acceder al sistema hasta cambiar tu contraseña</p>
+          </div>
+        )}
       </div>
     </div>
   )
