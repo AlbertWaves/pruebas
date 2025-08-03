@@ -17,16 +17,16 @@ const InfoIncubadoraSchema = new mongoose.Schema(
     sensores: {
       type: [Number],
       required: true,
+      ref: "Componentes",
     },
     actuadores: {
       type: [Number],
       required: true,
+      ref: "Componentes",
     },
   },
   {
     _id: false,
-    versionKey: false,
-    timestamps: false,
   },
 )
 

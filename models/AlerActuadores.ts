@@ -10,7 +10,7 @@ const AlerActuadoresSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
-    idActuador: {
+    idComponente: {
       type: Number,
       required: true,
       ref: "Componentes",

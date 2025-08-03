@@ -4,14 +4,14 @@ const HistorialHumSchema = new mongoose.Schema(
   {
     _id: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
+      auto: true,
     },
     fechaRegistro: {
       type: Date,
       required: true,
     },
     humedad: {
-      type: mongoose.Schema.Types.Mixed, // Puede ser double o int
+      type: Number,
       required: true,
     },
     idInfoIncubadora: {
@@ -26,7 +26,7 @@ const HistorialHumSchema = new mongoose.Schema(
     },
   },
   {
-    _id: false,
+    _id: true,
   },
 )
 

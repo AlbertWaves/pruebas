@@ -4,10 +4,14 @@ const HistorialTempSchema = new mongoose.Schema(
   {
     _id: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
+      auto: true,
     },
     fechaRegistro: {
       type: Date,
+      required: true,
+    },
+    temperatura: {
+      type: Number,
       required: true,
     },
     idInfoIncubadora: {
@@ -20,13 +24,9 @@ const HistorialTempSchema = new mongoose.Schema(
       required: true,
       ref: "Componentes",
     },
-    temperatura: {
-      type: mongoose.Schema.Types.Mixed, // Puede ser double o int
-      required: true,
-    },
   },
   {
-    _id: false,
+    _id: true,
   },
 )
 

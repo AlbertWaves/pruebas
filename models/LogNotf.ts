@@ -4,7 +4,7 @@ const LogNotfSchema = new mongoose.Schema(
   {
     _id: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
+      auto: true,
     },
     fechaHora: {
       type: Date,
@@ -35,9 +35,7 @@ const LogNotfSchema = new mongoose.Schema(
     },
   },
   {
-    _id: false,
-    versionKey: false,
-    timestamps: false,
+    _id: true,
   },
 )
 

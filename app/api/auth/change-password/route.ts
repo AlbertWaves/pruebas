@@ -8,26 +8,36 @@ export async function POST(request: NextRequest) {
 
     const { userId, currentPassword, newPassword } = await request.json()
 
+    // Validar que se proporcionen todos los campos
+    if (!userId || !currentPassword || !newPassword) {
+      return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 })
+    }
+
     // Buscar usuario
     const user = await User.findOne({ _id: userId })
 
-    if (!user || user.contrasena !== currentPassword) {
+    if (!user) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 })
+    }
+
+    // Verificar contraseña actual
+    if (user.contrasena !== currentPassword) {
       return NextResponse.json({ error: "Contraseña actual incorrecta" }, { status: 401 })
     }
 
-    // Verificar que la nueva contraseña no sea la misma que la actual
+    // Validar que la nueva contraseña no sea la misma que la actual
     if (currentPassword === newPassword) {
       return NextResponse.json({ error: "La nueva contraseña debe ser diferente a la actual" }, { status: 400 })
     }
 
-    // Verificar que la nueva contraseña no sea la por defecto
+    // Validar que la nueva contraseña no sea la por defecto
     if (newPassword === "123456789") {
-      return NextResponse.json({ error: "No puede usar la contraseña por defecto" }, { status: 400 })
+      return NextResponse.json({ error: "No puedes usar la contraseña por defecto" }, { status: 400 })
     }
 
-    // Validar longitud mínima
-    if (newPassword.length < 6) {
-      return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres" }, { status: 400 })
+    // Validar longitud mínima de la nueva contraseña
+    if (newPassword.length < 8) {
+      return NextResponse.json({ error: "La nueva contraseña debe tener al menos 8 caracteres" }, { status: 400 })
     }
 
     // Actualizar contraseña
@@ -35,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: "Contraseña actualizada exitosamente" })
   } catch (error) {
-    console.error("Error al cambiar contraseña:", error)
+    console.error("Error changing password:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }
