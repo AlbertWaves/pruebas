@@ -15,12 +15,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Credenciales incorrectas" }, { status: 401 })
     }
 
+    // Verificar si el usuario está activo
+    if (!user.estado) {
+      return NextResponse.json({ error: "Usuario inactivo. Contacte al administrador." }, { status: 403 })
+    }
+
+    // Verificar si usa la contraseña por defecto
+    const isDefaultPassword = user.contrasena === "123456789"
+
     // Remover contraseña de la respuesta
     const { contrasena, ...userWithoutPassword } = user
 
     return NextResponse.json({
       message: "Login exitoso",
       user: userWithoutPassword,
+      requiresPasswordChange: isDefaultPassword,
     })
   } catch (error) {
     console.error("Error en login:", error)

@@ -15,10 +15,10 @@ const HistorialTempSchema = new mongoose.Schema(
       required: true,
       ref: "InfoIncubadora",
     },
-    idSensor: {
+    idComponente: {
       type: Number,
       required: true,
-      ref: "Sensor",
+      ref: "Componentes",
     },
     temperatura: {
       type: mongoose.Schema.Types.Mixed, // Puede ser double o int

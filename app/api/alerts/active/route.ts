@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import connectDB from "@/lib/mongodb"
-import AlerActuadores from "@/models/AlerActuadores"
-import Actuadores from "@/models/Actuadores"
+import LogNotf from "@/models/LogNotf"
+import Componentes from "@/models/Componentes"
 
 export async function GET() {
   try {
@@ -11,26 +11,29 @@ export async function GET() {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
-    const alerts = await AlerActuadores.find({
-      fechaRegistro: { $gte: yesterday },
+    const alerts = await LogNotf.find({
+      fechaHora: { $gte: yesterday },
     })
-      .sort({ fechaRegistro: -1 })
+      .sort({ fechaHora: -1 })
       .lean()
 
-    // Obtener información de los actuadores
-    const alertsWithActuators = await Promise.all(
+    // Obtener información de los componentes
+    const alertsWithComponents = await Promise.all(
       alerts.map(async (alert) => {
-        const actuador = await Actuadores.findOne({ _id: alert.idActuador }).lean()
+        const component = await Componentes.findOne({ _id: alert.idComponente }).lean()
         return {
           ...alert,
-          nombreActuador: actuador?.nombreActuador || "Actuador desconocido",
-          tipo: "warning" as const,
-          mensaje: `Se activó ${actuador?.nombreActuador || "actuador"}`,
+          nombreComponente: component?.nombreComponente || "Componente desconocido",
+          tipo:
+            alert.tipo === "temperatura" && (alert.condicion === "mayor" || alert.condicion === "menor")
+              ? "critical"
+              : "warning",
+          mensaje: `${alert.tipo === "temperatura" ? "Temperatura" : "Humedad"} ${alert.condicion} al umbral (${alert.valor}${alert.tipo === "temperatura" ? "°C" : "%"})`,
         }
       }),
     )
 
-    return NextResponse.json(alertsWithActuators)
+    return NextResponse.json(alertsWithComponents)
   } catch (error) {
     console.error("Error al obtener alertas activas:", error)
     return NextResponse.json({ error: "Error al obtener alertas activas" }, { status: 500 })

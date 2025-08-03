@@ -19,10 +19,10 @@ const HistorialHumSchema = new mongoose.Schema(
       required: true,
       ref: "InfoIncubadora",
     },
-    idSensor: {
+    idComponente: {
       type: Number,
       required: true,
-      ref: "Sensor",
+      ref: "Componentes",
     },
   },
   {

@@ -21,9 +21,15 @@ export async function POST(request: NextRequest) {
     const userData = await request.json()
 
     // Verificar si el email ya existe
-    const existingUser = await User.findOne({ correo: userData.correo })
-    if (existingUser) {
+    const existingUserByEmail = await User.findOne({ correo: userData.correo })
+    if (existingUserByEmail) {
       return NextResponse.json({ error: "El correo electrónico ya está registrado" }, { status: 400 })
+    }
+
+    // Verificar si el teléfono ya existe
+    const existingUserByPhone = await User.findOne({ numTel: userData.numTel })
+    if (existingUserByPhone) {
+      return NextResponse.json({ error: "El número de teléfono ya está registrado" }, { status: 400 })
     }
 
     // Obtener el siguiente ID
@@ -33,6 +39,7 @@ export async function POST(request: NextRequest) {
     const newUser = new User({
       _id: nextId,
       ...userData,
+      contrasena: "123456789", // Contraseña por defecto
       estado: true, // Por defecto activo
     })
 

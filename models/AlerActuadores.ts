@@ -13,7 +13,7 @@ const AlerActuadoresSchema = new mongoose.Schema(
     idActuador: {
       type: Number,
       required: true,
-      ref: "Actuadores",
+      ref: "Componentes",
     },
     idInfoIncubadora: {
       type: Number,

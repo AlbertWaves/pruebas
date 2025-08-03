@@ -14,16 +14,11 @@ const InfoIncubadoraSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    idIncubadora: {
-      type: Number,
-      required: true,
-      ref: "Incubadora",
-    },
-    idSensores: {
+    sensores: {
       type: [Number],
       required: true,
     },
-    idActivadores: {
+    actuadores: {
       type: [Number],
       required: true,
     },
