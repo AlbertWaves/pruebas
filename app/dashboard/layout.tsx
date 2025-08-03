@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Home, AlertTriangle, Users, LogOut, Settings, Leaf } from "lucide-react"
+import { Home, AlertTriangle, Users, LogOut, User, Leaf } from "lucide-react"
 
 interface DashboardUser {
   _id: number
@@ -145,14 +145,8 @@ export default function DashboardLayout({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard/profile" className="flex items-center">
-                    <Leaf className="mr-2 h-4 w-4" />
+                    <User className="mr-2 h-4 w-4" />
                     Mi Perfil
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings" className="flex items-center">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Configuración
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

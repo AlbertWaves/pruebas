@@ -1,38 +1,25 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { connectDB } from "@/lib/mongodb"
+import connectDB from "@/lib/mongodb"
+import User from "@/models/User"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { db } = await connectDB()
-    const userId = Number.parseInt(params.id)
+    await connectDB()
 
-    if (isNaN(userId)) {
-      return NextResponse.json({ error: "ID de usuario inválido" }, { status: 400 })
-    }
+    const id = Number.parseInt(params.id)
 
     // Verificar que el usuario existe
-    const user = await db.collection("USUARIOS").findOne({ _id: userId })
+    const user = await User.findOne({ _id: id })
     if (!user) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 })
     }
 
     // Resetear la contraseña a la por defecto
-    const result = await db.collection("USUARIOS").updateOne(
-      { _id: userId },
-      {
-        $set: {
-          contrasena: "123456789",
-        },
-      },
-    )
-
-    if (result.modifiedCount === 0) {
-      return NextResponse.json({ error: "No se pudo resetear la contraseña" }, { status: 500 })
-    }
+    await User.findOneAndUpdate({ _id: id }, { contrasena: "123456789" })
 
     return NextResponse.json({
-      success: true,
-      message: "Contraseña reseteada exitosamente a 123456789",
+      message: "Contraseña reseteada exitosamente",
+      newPassword: "123456789",
     })
   } catch (error) {
     console.error("Error al resetear contraseña:", error)

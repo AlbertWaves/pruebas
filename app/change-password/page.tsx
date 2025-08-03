@@ -67,9 +67,9 @@ export default function ChangePasswordPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId,
+          userId: Number.parseInt(userId!),
+          currentPassword: "123456789", // Siempre es la contraseña por defecto en el primer cambio
           newPassword,
-          isFirstTime: true,
         }),
       })
 

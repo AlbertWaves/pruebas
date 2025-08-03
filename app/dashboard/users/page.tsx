@@ -16,6 +16,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -54,7 +65,6 @@ export default function UsersPage() {
     segundoApell: "",
     numTel: "",
     correo: "",
-    contrasena: "",
     idRol: 2,
   })
 
@@ -107,11 +117,7 @@ export default function UsersPage() {
     return phoneRegex.test(phone) && phone.replace(/\D/g, "").length >= 10
   }
 
-  const validatePassword = (password: string) => {
-    return password.length >= 6
-  }
-
-  const validateForm = (userData: any) => {
+  const validateForm = (userData: any, isEdit = false) => {
     const newErrors: Record<string, string> = {}
 
     if (!validateName(userData.nombre)) {
@@ -126,16 +132,12 @@ export default function UsersPage() {
       newErrors.segundoApell = "El segundo apellido debe contener solo letras"
     }
 
-    if (!validateEmail(userData.correo)) {
+    if (!isEdit && !validateEmail(userData.correo)) {
       newErrors.correo = "Ingrese un correo electrónico válido"
     }
 
     if (!validatePhone(userData.numTel)) {
       newErrors.numTel = "Ingrese un número de teléfono válido (mínimo 10 dígitos)"
-    }
-
-    if (userData.contrasena && !validatePassword(userData.contrasena)) {
-      newErrors.contrasena = "La contraseña debe tener al menos 6 caracteres"
     }
 
     setErrors(newErrors)
@@ -180,20 +182,19 @@ export default function UsersPage() {
       })
 
       if (response.ok) {
-        const createdUser = await response.json()
-        setUsers((prev) => [...prev, createdUser])
+        const result = await response.json()
+        setUsers((prev) => [...prev, result.user])
         setNewUser({
           nombre: "",
           primerApell: "",
           segundoApell: "",
           numTel: "",
           correo: "",
-          contrasena: "",
           idRol: 2,
         })
         setErrors({})
         setIsCreateDialogOpen(false)
-        alert("Usuario creado exitosamente")
+        alert("Usuario creado exitosamente con contraseña por defecto: 123456789")
       } else {
         const errorData = await response.json()
         alert(errorData.error || "Error al crear el usuario")
@@ -214,7 +215,7 @@ export default function UsersPage() {
     e.preventDefault()
     if (!editingUser) return
 
-    if (!validateForm(editingUser)) {
+    if (!validateForm(editingUser, true)) {
       return
     }
 
@@ -222,7 +223,14 @@ export default function UsersPage() {
       const response = await fetch(`/api/users/${editingUser._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingUser),
+        body: JSON.stringify({
+          nombre: editingUser.nombre,
+          primerApell: editingUser.primerApell,
+          segundoApell: editingUser.segundoApell,
+          numTel: editingUser.numTel,
+          estado: editingUser.estado,
+          idRol: editingUser.idRol,
+        }),
       })
 
       if (response.ok) {
@@ -263,6 +271,24 @@ export default function UsersPage() {
     }
   }
 
+  const handleResetPassword = async (userId: number) => {
+    try {
+      const response = await fetch(`/api/users/${userId}/reset-password`, {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        alert("Contraseña reseteada exitosamente. La nueva contraseña es: 123456789")
+      } else {
+        const errorData = await response.json()
+        alert(errorData.error || "Error al resetear la contraseña")
+      }
+    } catch (error) {
+      console.error("Error al resetear contraseña:", error)
+      alert("Error al resetear la contraseña")
+    }
+  }
+
   const getRoleName = (idRol: number) => {
     const role = roles.find((r) => r._id === idRol)
     return role ? role.nombreRol : "Desconocido"
@@ -282,36 +308,12 @@ export default function UsersPage() {
     return value
   }
 
-  const handleResetPassword = async (userId: number) => {
-    if (
-      confirm(
-        "¿Estás seguro de que deseas resetear la contraseña de este usuario? La contraseña será cambiada a '123456789'",
-      )
-    ) {
-      try {
-        const response = await fetch(`/api/users/${userId}/reset-password`, {
-          method: "POST",
-        })
-
-        if (response.ok) {
-          alert("Contraseña reseteada exitosamente. La nueva contraseña es: 123456789")
-        } else {
-          const errorData = await response.json()
-          alert(errorData.error || "Error al resetear la contraseña")
-        }
-      } catch (error) {
-        console.error("Error al resetear contraseña:", error)
-        alert("Error al resetear la contraseña")
-      }
-    }
-  }
-
   if (loading) {
     return <div>Cargando...</div>
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -325,51 +327,53 @@ export default function UsersPage() {
               Agregar Usuario
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Usuario</DialogTitle>
               <DialogDescription>
-                Agregar un nuevo usuario al sistema. Recibirán credenciales de acceso por correo electrónico.
+                Agregar un nuevo usuario al sistema. La contraseña por defecto será: 123456789
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateUser} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="nombre">Nombre *</Label>
-                <Input
-                  id="nombre"
-                  placeholder="Ingresa el nombre"
-                  value={newUser.nombre}
-                  onChange={(e) => {
-                    const value = handleNameInput(e)
-                    setNewUser((prev) => ({ ...prev, nombre: value }))
-                  }}
-                  className={errors.nombre ? "border-red-500" : ""}
-                  required
-                />
-                {errors.nombre && <p className="text-sm text-red-500">{errors.nombre}</p>}
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="nombre">Nombre *</Label>
+                  <Input
+                    id="nombre"
+                    placeholder="Ingresa el nombre"
+                    value={newUser.nombre}
+                    onChange={(e) => {
+                      const value = handleNameInput(e)
+                      setNewUser((prev) => ({ ...prev, nombre: value }))
+                    }}
+                    className={errors.nombre ? "border-red-500" : ""}
+                    required
+                  />
+                  {errors.nombre && <p className="text-sm text-red-500">{errors.nombre}</p>}
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="primerApell">Primer Apellido *</Label>
-                <Input
-                  id="primerApell"
-                  placeholder="Ingresa el primer apellido"
-                  value={newUser.primerApell}
-                  onChange={(e) => {
-                    const value = handleNameInput(e)
-                    setNewUser((prev) => ({ ...prev, primerApell: value }))
-                  }}
-                  className={errors.primerApell ? "border-red-500" : ""}
-                  required
-                />
-                {errors.primerApell && <p className="text-sm text-red-500">{errors.primerApell}</p>}
+                <div className="space-y-2">
+                  <Label htmlFor="primerApell">Primer Apellido *</Label>
+                  <Input
+                    id="primerApell"
+                    placeholder="Primer apellido"
+                    value={newUser.primerApell}
+                    onChange={(e) => {
+                      const value = handleNameInput(e)
+                      setNewUser((prev) => ({ ...prev, primerApell: value }))
+                    }}
+                    className={errors.primerApell ? "border-red-500" : ""}
+                    required
+                  />
+                  {errors.primerApell && <p className="text-sm text-red-500">{errors.primerApell}</p>}
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="segundoApell">Segundo Apellido</Label>
                 <Input
                   id="segundoApell"
-                  placeholder="Ingresa el segundo apellido (opcional)"
+                  placeholder="Segundo apellido (opcional)"
                   value={newUser.segundoApell}
                   onChange={(e) => {
                     const value = handleNameInput(e)
@@ -385,7 +389,7 @@ export default function UsersPage() {
                 <Input
                   id="correo"
                   type="email"
-                  placeholder="Ingresa el correo electrónico"
+                  placeholder="correo@ejemplo.com"
                   value={newUser.correo}
                   onChange={(e) => setNewUser((prev) => ({ ...prev, correo: e.target.value }))}
                   className={errors.correo ? "border-red-500" : ""}
@@ -398,7 +402,7 @@ export default function UsersPage() {
                 <Label htmlFor="telefono">Número de Teléfono *</Label>
                 <Input
                   id="telefono"
-                  placeholder="Ingresa el número de teléfono"
+                  placeholder="Número de teléfono"
                   value={newUser.numTel}
                   onChange={(e) => {
                     const value = handlePhoneInput(e)
@@ -408,20 +412,6 @@ export default function UsersPage() {
                   required
                 />
                 {errors.numTel && <p className="text-sm text-red-500">{errors.numTel}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="contrasena">Contraseña *</Label>
-                <Input
-                  id="contrasena"
-                  type="password"
-                  placeholder="Ingresa la contraseña (mínimo 6 caracteres)"
-                  value={newUser.contrasena}
-                  onChange={(e) => setNewUser((prev) => ({ ...prev, contrasena: e.target.value }))}
-                  className={errors.contrasena ? "border-red-500" : ""}
-                  required
-                />
-                {errors.contrasena && <p className="text-sm text-red-500">{errors.contrasena}</p>}
               </div>
 
               <div className="space-y-2">
@@ -441,6 +431,13 @@ export default function UsersPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded-md">
+                <p className="text-sm text-blue-800">
+                  <strong>Nota:</strong> La contraseña por defecto será <code>123456789</code>. El usuario deberá
+                  cambiarla en su primer inicio de sesión.
+                </p>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">
@@ -620,10 +617,35 @@ export default function UsersPage() {
                           <Trash2 className="w-4 h-4 mr-2" />
                           Eliminar
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleResetPassword(user._id)} className="text-orange-600">
-                          <RotateCcw className="w-4 h-4 mr-2" />
-                          Resetear Contraseña
-                        </DropdownMenuItem>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-orange-600">
+                              <RotateCcw className="w-4 h-4 mr-2" />
+                              Resetear Contraseña
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Resetear contraseña?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción cambiará la contraseña del usuario a la contraseña por defecto:{" "}
+                                <strong>123456789</strong>
+                                <br />
+                                <br />
+                                El usuario deberá cambiar su contraseña en el próximo inicio de sesión.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleResetPassword(user._id)}
+                                className="bg-orange-600 hover:bg-orange-700"
+                              >
+                                Resetear Contraseña
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -636,41 +658,43 @@ export default function UsersPage() {
 
       {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar Usuario</DialogTitle>
             <DialogDescription>Modificar la información del usuario seleccionado.</DialogDescription>
           </DialogHeader>
           {editingUser && (
             <form onSubmit={handleUpdateUser} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="editNombre">Nombre *</Label>
-                <Input
-                  id="editNombre"
-                  value={editingUser.nombre}
-                  onChange={(e) => {
-                    const value = handleNameInput(e)
-                    setEditingUser((prev) => (prev ? { ...prev, nombre: value } : null))
-                  }}
-                  className={errors.nombre ? "border-red-500" : ""}
-                  required
-                />
-                {errors.nombre && <p className="text-sm text-red-500">{errors.nombre}</p>}
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editNombre">Nombre *</Label>
+                  <Input
+                    id="editNombre"
+                    value={editingUser.nombre}
+                    onChange={(e) => {
+                      const value = handleNameInput(e)
+                      setEditingUser((prev) => (prev ? { ...prev, nombre: value } : null))
+                    }}
+                    className={errors.nombre ? "border-red-500" : ""}
+                    required
+                  />
+                  {errors.nombre && <p className="text-sm text-red-500">{errors.nombre}</p>}
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="editPrimerApell">Primer Apellido *</Label>
-                <Input
-                  id="editPrimerApell"
-                  value={editingUser.primerApell}
-                  onChange={(e) => {
-                    const value = handleNameInput(e)
-                    setEditingUser((prev) => (prev ? { ...prev, primerApell: value } : null))
-                  }}
-                  className={errors.primerApell ? "border-red-500" : ""}
-                  required
-                />
-                {errors.primerApell && <p className="text-sm text-red-500">{errors.primerApell}</p>}
+                <div className="space-y-2">
+                  <Label htmlFor="editPrimerApell">Primer Apellido *</Label>
+                  <Input
+                    id="editPrimerApell"
+                    value={editingUser.primerApell}
+                    onChange={(e) => {
+                      const value = handleNameInput(e)
+                      setEditingUser((prev) => (prev ? { ...prev, primerApell: value } : null))
+                    }}
+                    className={errors.primerApell ? "border-red-500" : ""}
+                    required
+                  />
+                  {errors.primerApell && <p className="text-sm text-red-500">{errors.primerApell}</p>}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -688,19 +712,6 @@ export default function UsersPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="editCorreo">Correo Electrónico *</Label>
-                <Input
-                  id="editCorreo"
-                  type="email"
-                  value={editingUser.correo}
-                  onChange={(e) => setEditingUser((prev) => (prev ? { ...prev, correo: e.target.value } : null))}
-                  className={errors.correo ? "border-red-500" : ""}
-                  required
-                />
-                {errors.correo && <p className="text-sm text-red-500">{errors.correo}</p>}
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="editTelefono">Número de Teléfono *</Label>
                 <Input
                   id="editTelefono"
@@ -715,51 +726,52 @@ export default function UsersPage() {
                 {errors.numTel && <p className="text-sm text-red-500">{errors.numTel}</p>}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="editEstado">Estado</Label>
-                <Select
-                  value={editingUser.estado.toString()}
-                  onValueChange={(value) =>
-                    setEditingUser((prev) => (prev ? { ...prev, estado: value === "true" } : null))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Activo</SelectItem>
-                    <SelectItem value="false">Inactivo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="editRol">Rol *</Label>
-                <Select
-                  value={editingUser.idRol.toString()}
-                  onValueChange={(value) => setEditingUser((prev) => (prev ? { ...prev, idRol: Number(value) } : null))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((role) => (
-                      <SelectItem key={role._id} value={role._id.toString()}>
-                        {role.nombreRol}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Contraseña</Label>
-                <div className="p-3 bg-gray-50 rounded-md">
-                  <p className="text-sm text-gray-600">
-                    Para cambiar la contraseña, usa la opción "Resetear Contraseña" en el menú de acciones. Esto
-                    establecerá la contraseña por defecto (123456789).
-                  </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editEstado">Estado</Label>
+                  <Select
+                    value={editingUser.estado.toString()}
+                    onValueChange={(value) =>
+                      setEditingUser((prev) => (prev ? { ...prev, estado: value === "true" } : null))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Activo</SelectItem>
+                      <SelectItem value="false">Inactivo</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editRol">Rol *</Label>
+                  <Select
+                    value={editingUser.idRol.toString()}
+                    onValueChange={(value) =>
+                      setEditingUser((prev) => (prev ? { ...prev, idRol: Number(value) } : null))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((role) => (
+                        <SelectItem key={role._id} value={role._id.toString()}>
+                          {role.nombreRol}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-600">
+                  <strong>Nota:</strong> El correo electrónico no se puede modificar desde aquí. Para cambiar la
+                  contraseña, usa la opción "Resetear Contraseña" en el menú de acciones.
+                </p>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">
