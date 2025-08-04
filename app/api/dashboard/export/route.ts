@@ -11,8 +11,9 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const range = searchParams.get("range") || "24h"
+    const format = searchParams.get("format") || "json"
 
-    // Calcular fecha de inicio basada en el rango
+    // Calcular fecha de inicio
     const now = new Date()
     const startDate = new Date()
 
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
         startDate.setHours(now.getHours() - 24)
     }
 
-    // Obtener datos de temperatura y humedad
+    // Obtener datos
     const [tempData, humData] = await Promise.all([
       HistorialTemp.find({
         idInfoIncubadora: 1,
@@ -47,52 +48,58 @@ export async function GET(request: Request) {
         .lean(),
     ])
 
-    // Combinar datos por timestamp
-    const combinedData = []
+    // Combinar datos
+    const exportData = []
     const tempMap = new Map()
     const humMap = new Map()
 
-    // Crear mapas por timestamp - promediando sensores
     tempData.forEach((item) => {
-      const timeKey = new Date(item.fechaRegistro).toISOString().slice(0, 16)
-      if (!tempMap.has(timeKey)) {
-        tempMap.set(timeKey, [])
-      }
-      tempMap.get(timeKey).push(item.temperatura)
+      const timeKey = item.fechaRegistro.toISOString()
+      tempMap.set(timeKey, item.temperatura)
     })
 
     humData.forEach((item) => {
-      const timeKey = new Date(item.fechaRegistro).toISOString().slice(0, 16)
-      if (!humMap.has(timeKey)) {
-        humMap.set(timeKey, [])
-      }
-      humMap.get(timeKey).push(item.humedad)
+      const timeKey = item.fechaRegistro.toISOString()
+      humMap.set(timeKey, item.humedad)
     })
 
-    // Combinar datos y promediar
     const allTimeKeys = new Set([...tempMap.keys(), ...humMap.keys()])
 
     Array.from(allTimeKeys)
       .sort()
       .forEach((timeKey) => {
         const date = new Date(timeKey)
-        const tempValues = tempMap.get(timeKey) || []
-        const humValues = humMap.get(timeKey) || []
-
-        const avgTemp = tempValues.length > 0 ? tempValues.reduce((a, b) => a + b, 0) / tempValues.length : 0
-        const avgHum = humValues.length > 0 ? humValues.reduce((a, b) => a + b, 0) / humValues.length : 0
-
-        combinedData.push({
-          time: date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }),
-          temperatura: Number(avgTemp.toFixed(2)),
-          humedad: Number(avgHum.toFixed(2)),
-          timestamp: date.toISOString(),
+        exportData.push({
+          fecha: date.toLocaleDateString("es-ES"),
+          hora: date.toLocaleTimeString("es-ES"),
+          temperatura: tempMap.get(timeKey) || null,
+          humedad: humMap.get(timeKey) || null,
         })
       })
 
-    return NextResponse.json(combinedData)
+    if (format === "csv") {
+      // Generar CSV
+      const csvHeader = "Fecha,Hora,Temperatura,Humedad\n"
+      const csvData = exportData
+        .map((row) => `${row.fecha},${row.hora},${row.temperatura || ""},${row.humedad || ""}`)
+        .join("\n")
+
+      return new NextResponse(csvHeader + csvData, {
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="datos_hermetia_${range}.csv"`,
+        },
+      })
+    }
+
+    // Retornar JSON por defecto
+    return NextResponse.json(exportData, {
+      headers: {
+        "Content-Disposition": `attachment; filename="datos_hermetia_${range}.json"`,
+      },
+    })
   } catch (error) {
-    console.error("Error al obtener datos históricos:", error)
-    return NextResponse.json({ error: "Error al obtener datos históricos" }, { status: 500 })
+    console.error("Error al exportar datos:", error)
+    return NextResponse.json({ error: "Error al exportar datos" }, { status: 500 })
   }
 }

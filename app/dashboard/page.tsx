@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Switch } from "@/components/ui/switch"
-import { Thermometer, Droplets, RefreshCw, TrendingUp, Clock, Download, Cpu, Zap } from "lucide-react"
+import { Thermometer, Droplets, RefreshCw, TrendingUp, Download, Cpu, Zap, Bell } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 interface SensorData {
@@ -28,6 +28,7 @@ interface HistoricalData {
   time: string
   temperatura: number
   humedad: number
+  timestamp: string
 }
 
 interface SensorStatus {
@@ -63,6 +64,7 @@ export default function Dashboard() {
     edoHumificador: false,
     edoVentilador: false,
   })
+  const [totalAlerts, setTotalAlerts] = useState(0)
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -70,6 +72,7 @@ export default function Dashboard() {
     loadOptimalRange()
     loadHistoricalData()
     loadSensorStatus()
+    loadTotalAlerts()
   }, [])
 
   // Auto-refresh
@@ -140,6 +143,18 @@ export default function Dashboard() {
     }
   }
 
+  const loadTotalAlerts = async () => {
+    try {
+      const response = await fetch("/api/alerts/history")
+      if (response.ok) {
+        const data = await response.json()
+        setTotalAlerts(data.length)
+      }
+    } catch (error) {
+      console.error("Error loading total alerts:", error)
+    }
+  }
+
   // Actualizar datos históricos cuando cambie el rango de tiempo
   useEffect(() => {
     loadHistoricalData()
@@ -182,6 +197,25 @@ export default function Dashboard() {
     return 3 // Calefactor, Humificador y Ventilador son actuadores
   }
 
+  const handleExport = async (format: "json" | "csv") => {
+    try {
+      const response = await fetch(`/api/dashboard/export?range=${timeRange}&format=${format}`)
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `datos_hermetia_${timeRange}.${format}`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      }
+    } catch (error) {
+      console.error("Error al exportar:", error)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -211,65 +245,51 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Sensores</CardTitle>
+            <Cpu className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {getActiveSensorsCount()}/{getTotalSensorsCount()}
+            </div>
+            <p className="text-xs text-muted-foreground">Sensores activos</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Actuadores</CardTitle>
+            <Zap className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              {getActiveActuatorsCount()}/{getTotalActuatorsCount()}
+            </div>
+            <p className="text-xs text-muted-foreground">Actuadores activos</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Alertas</CardTitle>
+            <Bell className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{totalAlerts}</div>
+            <p className="text-xs text-muted-foreground">Historial completo</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Estado General</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Cpu className="h-4 w-4 text-blue-500" />
-                <div className="text-lg font-bold text-blue-600">
-                  {getActiveSensorsCount()}/{getTotalSensorsCount()} Sensores
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Zap className="h-4 w-4 text-orange-500" />
-                <div className="text-lg font-bold text-orange-600">
-                  {getActiveActuatorsCount()}/{getTotalActuatorsCount()} Actuadores
-                </div>
-              </div>
+            <div className="text-2xl font-bold text-green-600">
+              {isTemperatureOptimal() && isHumidityOptimal() ? "Óptimo" : "Alerta"}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Sistemas operativos</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas Críticas</CardTitle>
-            <div className="h-4 w-4 text-red-500">⚠</div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {!isTemperatureOptimal() || !isHumidityOptimal() ? "1" : "0"}
-            </div>
-            <p className="text-xs text-muted-foreground">Condiciones críticas</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Advertencias</CardTitle>
-            <div className="h-4 w-4 text-yellow-500">⚡</div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
-              {(!isTemperatureOptimal() ? 1 : 0) + (!isHumidityOptimal() ? 1 : 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">Condiciones de precaución</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Última Actualización</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{sensorData.timestamp}</div>
-            <div className="flex items-center space-x-2 mt-2">
-              <Switch checked={isAutoRefresh} onCheckedChange={setIsAutoRefresh} />
-              <span className="text-xs text-muted-foreground">Auto-actualizar</span>
-            </div>
+            <p className="text-xs text-muted-foreground">Condiciones ambientales</p>
           </CardContent>
         </Card>
       </div>
@@ -396,9 +416,13 @@ export default function Dashboard() {
                   <SelectItem value="30d">Últimos 30d</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
                 <Download className="w-4 h-4 mr-2" />
-                Exportar
+                CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExport("json")}>
+                <Download className="w-4 h-4 mr-2" />
+                JSON
               </Button>
             </div>
           </div>
