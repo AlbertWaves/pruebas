@@ -2,10 +2,6 @@ import mongoose from "mongoose"
 
 const LogNotfSchema = new mongoose.Schema(
   {
-    _id: {
-      type: mongoose.Schema.Types.ObjectId,
-      auto: true,
-    },
     fechaHora: {
       type: Date,
       required: true,
@@ -31,11 +27,10 @@ const LogNotfSchema = new mongoose.Schema(
     idComponente: {
       type: Number,
       required: true,
-      ref: "Componentes",
     },
   },
   {
-    _id: true,
+    timestamps: false,
   },
 )
 
