@@ -8,8 +8,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Switch } from "@/components/ui/switch"
-import { Thermometer, Droplets, RefreshCw, TrendingUp, Download, Cpu, Zap, Bell } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  Thermometer,
+  Droplets,
+  RefreshCw,
+  Download,
+  Cpu,
+  Zap,
+  Bell,
+  FileText,
+  FileSpreadsheet,
+  FileJson,
+} from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import html2canvas from "html2canvas"
+import { jsPDF } from "jspdf"
 
 interface SensorData {
   temperatura: number
@@ -197,19 +211,63 @@ export default function Dashboard() {
     return 3 // Calefactor, Humificador y Ventilador son actuadores
   }
 
-  const handleExport = async (format: "json" | "csv") => {
+  const handleExport = async (format: "json" | "csv" | "pdf") => {
     try {
-      const response = await fetch(`/api/dashboard/export?range=${timeRange}&format=${format}`)
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `datos_hermetia_${timeRange}.${format}`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
+      if (format === "pdf") {
+        // Para PDF, necesitamos capturar el gráfico
+        const chartElement = document.querySelector(".recharts-wrapper")
+        if (chartElement) {
+          const canvas = await html2canvas(chartElement as HTMLElement)
+          const imgData = canvas.toDataURL("image/png")
+
+          const pdf = new jsPDF()
+
+          // Título
+          pdf.setFontSize(20)
+          pdf.text("Reporte Hermetia Vitalis", 20, 20)
+
+          // Información actual
+          pdf.setFontSize(12)
+          pdf.text(
+            `Temperatura: ${convertTemperature(sensorData.temperatura).toFixed(1)}${getTemperatureUnit()}`,
+            20,
+            40,
+          )
+          pdf.text(`Humedad: ${sensorData.humedad.toFixed(1)}%`, 20, 50)
+          pdf.text(`Rango de tiempo: ${timeRange}`, 20, 60)
+
+          // Gráfico
+          pdf.addImage(imgData, "PNG", 20, 80, 170, 100)
+
+          // Tabla de datos
+          let yPosition = 200
+          pdf.text("Datos Históricos:", 20, yPosition)
+          yPosition += 10
+
+          historicalData.slice(0, 10).forEach((row, index) => {
+            pdf.text(
+              `${row.time} - Temp: ${convertTemperature(row.temperatura).toFixed(1)}${getTemperatureUnit()} - Hum: ${row.humedad.toFixed(1)}%`,
+              20,
+              yPosition,
+            )
+            yPosition += 8
+          })
+
+          pdf.save(`reporte_hermetia_${timeRange}.pdf`)
+        }
+      } else {
+        const response = await fetch(`/api/dashboard/export?range=${timeRange}&format=${format}`)
+        if (response.ok) {
+          const blob = await response.blob()
+          const url = window.URL.createObjectURL(blob)
+          const a = document.createElement("a")
+          a.href = url
+          a.download = `datos_hermetia_${timeRange}.${format}`
+          document.body.appendChild(a)
+          a.click()
+          window.URL.revokeObjectURL(url)
+          document.body.removeChild(a)
+        }
       }
     } catch (error) {
       console.error("Error al exportar:", error)
@@ -217,262 +275,271 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Monitoreo Hermetia Vitalis</h1>
-          <p className="text-gray-600">Sistema de monitoreo para incubadoras de Hermetia illucens</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">°C</span>
-            <Switch checked={!isCelsius} onCheckedChange={(checked) => setIsCelsius(!checked)} />
-            <span className="text-sm text-gray-600">°F</span>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Monitoreo Hermetia Vitalis</h1>
+            <p className="text-lg text-gray-600">Sistema de monitoreo para incubadoras de Hermetia illucens</p>
           </div>
-          <Button variant="outline" size="sm" onClick={loadCurrentData}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Actualizar
-          </Button>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Auto ON</span>
-            <Switch checked={isAutoRefresh} onCheckedChange={setIsAutoRefresh} />
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-3">
+              <span className="text-sm font-medium text-gray-600">°C</span>
+              <Switch checked={!isCelsius} onCheckedChange={(checked) => setIsCelsius(!checked)} />
+              <span className="text-sm font-medium text-gray-600">°F</span>
+            </div>
+            <Button variant="outline" size="lg" onClick={loadCurrentData} className="px-6 bg-transparent">
+              <RefreshCw className="w-5 h-5 mr-2" />
+              Actualizar
+            </Button>
+            <div className="flex items-center space-x-3">
+              <span className="text-sm font-medium text-gray-600">Auto ON</span>
+              <Switch checked={isAutoRefresh} onCheckedChange={setIsAutoRefresh} />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Sensores</CardTitle>
-            <Cpu className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {getActiveSensorsCount()}/{getTotalSensorsCount()}
-            </div>
-            <p className="text-xs text-muted-foreground">Sensores activos</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Actuadores</CardTitle>
-            <Zap className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {getActiveActuatorsCount()}/{getTotalActuatorsCount()}
-            </div>
-            <p className="text-xs text-muted-foreground">Actuadores activos</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Alertas</CardTitle>
-            <Bell className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{totalAlerts}</div>
-            <p className="text-xs text-muted-foreground">Historial completo</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estado General</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {isTemperatureOptimal() && isHumidityOptimal() ? "Óptimo" : "Alerta"}
-            </div>
-            <p className="text-xs text-muted-foreground">Condiciones ambientales</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Temperature */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Thermometer className="h-5 w-5 text-red-500" />
-                <CardTitle>Temperatura</CardTitle>
+        {/* Status Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <Card className="shadow-lg border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-lg font-semibold">Sensores</CardTitle>
+              <Cpu className="h-6 w-6 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-blue-600 mb-2">
+                {getActiveSensorsCount()}/{getTotalSensorsCount()}
               </div>
-              <div className={`w-3 h-3 rounded-full ${isTemperatureOptimal() ? "bg-green-500" : "bg-red-500"}`} />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-center mb-4">
-              <div className="relative w-32 h-32">
-                <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="#e5e7eb"
-                    strokeWidth="3"
-                  />
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke={isTemperatureOptimal() ? "#10b981" : "#ef4444"}
-                    strokeWidth="3"
-                    strokeDasharray={`${(convertTemperature(sensorData.temperatura) / 50) * 100}, 100`}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">{convertTemperature(sensorData.temperatura).toFixed(1)}</div>
-                    <div className="text-sm text-gray-500">{getTemperatureUnit()}</div>
+              <p className="text-sm text-muted-foreground">Sensores activos</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-lg font-semibold">Actuadores</CardTitle>
+              <Zap className="h-6 w-6 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-orange-600 mb-2">
+                {getActiveActuatorsCount()}/{getTotalActuatorsCount()}
+              </div>
+              <p className="text-sm text-muted-foreground">Actuadores activos</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-lg font-semibold">Total Alertas</CardTitle>
+              <Bell className="h-6 w-6 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-600 mb-2">{totalAlerts}</div>
+              <p className="text-sm text-muted-foreground">Historial completo</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Temperature */}
+          <Card className="shadow-lg border-0">
+            <CardHeader className="pb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Thermometer className="h-6 w-6 text-red-500" />
+                  <CardTitle className="text-xl">Temperatura</CardTitle>
+                </div>
+                <div className={`w-4 h-4 rounded-full ${isTemperatureOptimal() ? "bg-green-500" : "bg-red-500"}`} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center mb-6">
+                <div className="relative w-40 h-40">
+                  <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#e5e7eb"
+                      strokeWidth="3"
+                    />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke={isTemperatureOptimal() ? "#10b981" : "#ef4444"}
+                      strokeWidth="3"
+                      strokeDasharray={`${(convertTemperature(sensorData.temperatura) / 50) * 100}, 100`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold">{convertTemperature(sensorData.temperatura).toFixed(1)}</div>
+                      <div className="text-lg text-gray-500">{getTemperatureUnit()}</div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-2">Rango óptimo: {getOptimalRangeText()}</p>
-              <Badge
-                variant={isTemperatureOptimal() ? "default" : "destructive"}
-                className={isTemperatureOptimal() ? "bg-green-100 text-green-800" : ""}
-              >
-                {isTemperatureOptimal() ? "Óptima" : "Fuera de rango"}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Humidity */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Droplets className="h-5 w-5 text-blue-500" />
-                <CardTitle>Humedad</CardTitle>
+              <div className="text-center">
+                <p className="text-base text-gray-600 mb-3">Rango óptimo: {getOptimalRangeText()}</p>
+                <Badge
+                  variant={isTemperatureOptimal() ? "default" : "destructive"}
+                  className={`text-sm px-4 py-2 ${isTemperatureOptimal() ? "bg-green-100 text-green-800" : ""}`}
+                >
+                  {isTemperatureOptimal() ? "Óptima" : "Fuera de rango"}
+                </Badge>
               </div>
-              <div className={`w-3 h-3 rounded-full ${isHumidityOptimal() ? "bg-green-500" : "bg-red-500"}`} />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-center mb-4">
-              <div className="relative w-32 h-32">
-                <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="#e5e7eb"
-                    strokeWidth="3"
-                  />
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke={isHumidityOptimal() ? "#3b82f6" : "#ef4444"}
-                    strokeWidth="3"
-                    strokeDasharray={`${sensorData.humedad}, 100`}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">{sensorData.humedad.toFixed(1)}</div>
-                    <div className="text-sm text-gray-500">%</div>
+            </CardContent>
+          </Card>
+
+          {/* Humidity */}
+          <Card className="shadow-lg border-0">
+            <CardHeader className="pb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Droplets className="h-6 w-6 text-blue-500" />
+                  <CardTitle className="text-xl">Humedad</CardTitle>
+                </div>
+                <div className={`w-4 h-4 rounded-full ${isHumidityOptimal() ? "bg-green-500" : "bg-red-500"}`} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center mb-6">
+                <div className="relative w-40 h-40">
+                  <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#e5e7eb"
+                      strokeWidth="3"
+                    />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke={isHumidityOptimal() ? "#3b82f6" : "#ef4444"}
+                      strokeWidth="3"
+                      strokeDasharray={`${sensorData.humedad}, 100`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold">{sensorData.humedad.toFixed(1)}</div>
+                      <div className="text-lg text-gray-500">%</div>
+                    </div>
                   </div>
                 </div>
               </div>
+              <div className="text-center">
+                <p className="text-base text-gray-600 mb-3">
+                  Rango óptimo: {optimalRange.humedadMin}% - {optimalRange.humedadMax}%
+                </p>
+                <Badge
+                  variant={isHumidityOptimal() ? "default" : "destructive"}
+                  className={`text-sm px-4 py-2 ${isHumidityOptimal() ? "bg-green-100 text-green-800" : ""}`}
+                >
+                  {isHumidityOptimal() ? "Óptima" : "Fuera de rango"}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Historical Trends */}
+        <Card className="shadow-lg border-0">
+          <CardHeader className="pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-2xl mb-2">Tendencias Históricas</CardTitle>
+                <CardDescription className="text-base">Datos de temperatura y humedad en el tiempo</CardDescription>
+              </div>
+              <div className="flex items-center space-x-4">
+                <Select value={timeRange} onValueChange={setTimeRange}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24h">Últimas 24h</SelectItem>
+                    <SelectItem value="7d">Últimos 7d</SelectItem>
+                    <SelectItem value="30d">Últimos 30d</SelectItem>
+                  </SelectContent>
+                </Select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="lg" className="px-6 bg-transparent">
+                      <Download className="w-5 h-5 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport("csv")}>
+                      <FileSpreadsheet className="w-4 h-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport("json")}>
+                      <FileJson className="w-4 h-4 mr-2" />
+                      JSON
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport("pdf")}>
+                      <FileText className="w-4 h-4 mr-2" />
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-2">
-                Rango óptimo: {optimalRange.humedadMin}% - {optimalRange.humedadMax}%
-              </p>
-              <Badge
-                variant={isHumidityOptimal() ? "default" : "destructive"}
-                className={isHumidityOptimal() ? "bg-green-100 text-green-800" : ""}
-              >
-                {isHumidityOptimal() ? "Óptima" : "Fuera de rango"}
-              </Badge>
-            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="grafico" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="grafico" className="text-base">
+                  Gráfico
+                </TabsTrigger>
+                <TabsTrigger value="tabla" className="text-base">
+                  Tabla
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="grafico" className="mt-6">
+                <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={historicalData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="time" />
+                      <YAxis />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="temperatura" stroke="#ef4444" strokeWidth={3} name="Temperatura" />
+                      <Line type="monotone" dataKey="humedad" stroke="#3b82f6" strokeWidth={3} name="Humedad" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </TabsContent>
+              <TabsContent value="tabla" className="mt-6">
+                <div className="max-h-96 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-base">Hora</TableHead>
+                        <TableHead className="text-base">Temperatura</TableHead>
+                        <TableHead className="text-base">Humedad</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {historicalData.map((row, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="text-base">{row.time}</TableCell>
+                          <TableCell className="text-base">
+                            {convertTemperature(row.temperatura).toFixed(1)}
+                            {getTemperatureUnit()}
+                          </TableCell>
+                          <TableCell className="text-base">{row.humedad.toFixed(1)}%</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
-
-      {/* Historical Trends */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Tendencias Históricas</CardTitle>
-              <CardDescription>Datos de temperatura y humedad en el tiempo</CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="24h">Últimas 24h</SelectItem>
-                  <SelectItem value="7d">Últimos 7d</SelectItem>
-                  <SelectItem value="30d">Últimos 30d</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
-                <Download className="w-4 h-4 mr-2" />
-                CSV
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => handleExport("json")}>
-                <Download className="w-4 h-4 mr-2" />
-                JSON
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="grafico" className="w-full">
-            <TabsList>
-              <TabsTrigger value="grafico">Gráfico</TabsTrigger>
-              <TabsTrigger value="tabla">Tabla</TabsTrigger>
-            </TabsList>
-            <TabsContent value="grafico" className="mt-4">
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={historicalData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="temperatura" stroke="#ef4444" strokeWidth={2} name="Temperatura" />
-                    <Line type="monotone" dataKey="humedad" stroke="#3b82f6" strokeWidth={2} name="Humedad" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </TabsContent>
-            <TabsContent value="tabla" className="mt-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Hora</TableHead>
-                    <TableHead>Temperatura</TableHead>
-                    <TableHead>Humedad</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {historicalData.map((row, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{row.time}</TableCell>
-                      <TableCell>
-                        {convertTemperature(row.temperatura).toFixed(1)}
-                        {getTemperatureUnit()}
-                      </TableCell>
-                      <TableCell>{row.humedad.toFixed(1)}%</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
     </div>
   )
 }

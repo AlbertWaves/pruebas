@@ -1,17 +1,18 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -27,53 +28,46 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Users, UserPlus, Search, Filter, MoreHorizontal, Edit, Trash2, RotateCcw } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-
-interface User {
-  _id: number
-  nombre: string
-  primerApell: string
-  segundoApell: string
-  numTel: string
-  correo: string
-  estado: boolean
-  idRol: number
-}
+import { Users, UserPlus, Search, Edit, Trash2, RotateCcw, Shield } from "lucide-react"
 
 interface Role {
-  _id: number
-  nombreRol: string
+  _id: string
+  nombre: string
+  descripcion: string
 }
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([])
-  const [roles, setRoles] = useState<Role[]>([])
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [users, setUsers] = useState([])
+  const [roles, setRoles] = useState([])
+  const [filteredUsers, setFilteredUsers] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const [newUser, setNewUser] = useState({
     nombre: "",
-    primerApell: "",
-    segundoApell: "",
-    numTel: "",
-    correo: "",
-    idRol: 2,
+    email: "",
+    password: "",
+    rol: "",
   })
 
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [editUser, setEditUser] = useState({
+    nombre: "",
+    email: "",
+    rol: "",
+  })
 
   useEffect(() => {
     loadUsers()
     loadRoles()
   }, [])
+
+  useEffect(() => {
+    filterUsers()
+  }, [users, searchTerm, roleFilter])
 
   const loadUsers = async () => {
     try {
@@ -101,79 +95,25 @@ export default function UsersPage() {
     }
   }
 
-  // Validaciones
-  const validateName = (name: string) => {
-    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/
-    return nameRegex.test(name) && name.trim().length >= 2
+  const filterUsers = () => {
+    let filtered = users
+
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (user) =>
+          user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.email.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    }
+
+    if (roleFilter !== "all") {
+      filtered = filtered.filter((user) => user.rol === roleFilter)
+    }
+
+    setFilteredUsers(filtered)
   }
 
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
-  }
-
-  const validatePhone = (phone: string) => {
-    const phoneRegex = /^[0-9+\-\s()]+$/
-    return phoneRegex.test(phone) && phone.replace(/\D/g, "").length >= 10
-  }
-
-  const validateForm = (userData: any, isEdit = false) => {
-    const newErrors: Record<string, string> = {}
-
-    if (!validateName(userData.nombre)) {
-      newErrors.nombre = "El nombre debe contener solo letras y tener al menos 2 caracteres"
-    }
-
-    if (!validateName(userData.primerApell)) {
-      newErrors.primerApell = "El apellido debe contener solo letras y tener al menos 2 caracteres"
-    }
-
-    if (userData.segundoApell && !validateName(userData.segundoApell)) {
-      newErrors.segundoApell = "El segundo apellido debe contener solo letras"
-    }
-
-    if (!isEdit && !validateEmail(userData.correo)) {
-      newErrors.correo = "Ingrese un correo electrónico válido"
-    }
-
-    if (!validatePhone(userData.numTel)) {
-      newErrors.numTel = "Ingrese un número de teléfono válido (mínimo 10 dígitos)"
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.correo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.numTel.includes(searchTerm)
-
-    const matchesRole = roleFilter === "all" || user.idRol.toString() === roleFilter
-
-    return matchesSearch && matchesRole
-  })
-
-  const getUserStats = () => {
-    const total = users.length
-    const active = users.filter((u) => u.estado).length
-    const inactive = users.filter((u) => !u.estado).length
-    const admins = users.filter((u) => u.idRol === 1).length
-    const regularUsers = users.filter((u) => u.idRol === 2).length
-
-    return { total, active, inactive, admins, regularUsers }
-  }
-
-  const stats = getUserStats()
-
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateForm(newUser)) {
-      return
-    }
-
+  const handleCreateUser = async () => {
     try {
       const response = await fetch("/api/users", {
         method: "POST",
@@ -182,610 +122,446 @@ export default function UsersPage() {
       })
 
       if (response.ok) {
-        const result = await response.json()
-        setUsers((prev) => [...prev, result.user])
-        setNewUser({
-          nombre: "",
-          primerApell: "",
-          segundoApell: "",
-          numTel: "",
-          correo: "",
-          idRol: 2,
-        })
-        setErrors({})
+        loadUsers()
         setIsCreateDialogOpen(false)
-        alert("Usuario creado exitosamente con contraseña por defecto: 123456789")
+        setNewUser({ nombre: "", email: "", password: "", rol: "" })
+        alert("Usuario creado exitosamente")
       } else {
-        const errorData = await response.json()
-        alert(errorData.error || "Error al crear el usuario")
+        alert("Error al crear usuario")
       }
     } catch (error) {
-      console.error("Error al crear usuario:", error)
-      alert("Error al crear el usuario")
+      console.error("Error creating user:", error)
+      alert("Error al crear usuario")
     }
   }
 
-  const handleEditUser = (user: User) => {
-    setEditingUser(user)
-    setErrors({})
-    setIsEditDialogOpen(true)
-  }
-
-  const handleUpdateUser = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingUser) return
-
-    if (!validateForm(editingUser, true)) {
-      return
-    }
+  const handleEditUser = async () => {
+    if (!selectedUser) return
 
     try {
-      const response = await fetch(`/api/users/${editingUser._id}`, {
+      const response = await fetch(`/api/users/${selectedUser._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: editingUser.nombre,
-          primerApell: editingUser.primerApell,
-          segundoApell: editingUser.segundoApell,
-          numTel: editingUser.numTel,
-          estado: editingUser.estado,
-          idRol: editingUser.idRol,
-        }),
+        body: JSON.stringify(editUser),
       })
 
       if (response.ok) {
-        const updatedUser = await response.json()
-        setUsers((prev) => prev.map((u) => (u._id === editingUser._id ? updatedUser : u)))
+        loadUsers()
         setIsEditDialogOpen(false)
-        setEditingUser(null)
-        setErrors({})
+        setSelectedUser(null)
         alert("Usuario actualizado exitosamente")
       } else {
-        const errorData = await response.json()
-        alert(errorData.error || "Error al actualizar el usuario")
+        alert("Error al actualizar usuario")
       }
     } catch (error) {
-      console.error("Error al actualizar usuario:", error)
-      alert("Error al actualizar el usuario")
+      console.error("Error updating user:", error)
+      alert("Error al actualizar usuario")
     }
   }
 
-  const handleDeleteUser = async (userId: number) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este usuario?")) {
-      try {
-        const response = await fetch(`/api/users/${userId}`, {
-          method: "DELETE",
-        })
+  const handleDeleteUser = async (userId) => {
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: "DELETE",
+      })
 
-        if (response.ok) {
-          setUsers((prev) => prev.filter((u) => u._id !== userId))
-          alert("Usuario eliminado exitosamente")
-        } else {
-          const errorData = await response.json()
-          alert(errorData.error || "Error al eliminar el usuario")
-        }
-      } catch (error) {
-        console.error("Error al eliminar usuario:", error)
-        alert("Error al eliminar el usuario")
+      if (response.ok) {
+        loadUsers()
+        alert("Usuario eliminado exitosamente")
+      } else {
+        alert("Error al eliminar usuario")
       }
+    } catch (error) {
+      console.error("Error deleting user:", error)
+      alert("Error al eliminar usuario")
     }
   }
 
-  const handleResetPassword = async (userId: number) => {
+  const handleResetPassword = async (userId) => {
     try {
       const response = await fetch(`/api/users/${userId}/reset-password`, {
         method: "POST",
       })
 
       if (response.ok) {
-        alert("Contraseña reseteada exitosamente. La nueva contraseña es: 123456789")
+        alert("Contraseña restablecida exitosamente")
       } else {
-        const errorData = await response.json()
-        alert(errorData.error || "Error al resetear la contraseña")
+        alert("Error al restablecer contraseña")
       }
     } catch (error) {
-      console.error("Error al resetear contraseña:", error)
-      alert("Error al resetear la contraseña")
+      console.error("Error resetting password:", error)
+      alert("Error al restablecer contraseña")
     }
   }
 
-  const getRoleName = (idRol: number) => {
-    const role = roles.find((r) => r._id === idRol)
-    return role ? role.nombreRol : "Desconocido"
+  const openEditDialog = (user) => {
+    setSelectedUser(user)
+    setEditUser({
+      nombre: user.nombre,
+      email: user.email,
+      rol: user.rol,
+    })
+    setIsEditDialogOpen(true)
   }
 
-  const getRoleBadgeVariant = (idRol: number) => {
-    return idRol === 1 ? "default" : "secondary"
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("es-ES")
   }
 
-  const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9+\-\s()]/g, "")
-    return value
-  }
-
-  const handleNameInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "")
-    return value
+  const getRoleBadgeColor = (role) => {
+    switch (role.toLowerCase()) {
+      case "admin":
+        return "bg-red-100 text-red-800"
+      case "supervisor":
+        return "bg-blue-100 text-blue-800"
+      case "operador":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
   }
 
   if (loading) {
-    return <div>Cargando...</div>
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl">Cargando usuarios...</div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
-          <p className="text-gray-600">Gestionar cuentas de usuario, roles y permisos del sistema</p>
-        </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-green-600 hover:bg-green-700">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Agregar Usuario
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-              <DialogDescription>
-                Agregar un nuevo usuario al sistema. La contraseña por defecto será: 123456789
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Gestión de Usuarios</h1>
+            <p className="text-lg text-gray-600">Administra usuarios y permisos del sistema</p>
+          </div>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="lg" className="px-6">
+                <UserPlus className="w-5 h-5 mr-2" />
+                Nuevo Usuario
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-xl">Crear Nuevo Usuario</DialogTitle>
+                <DialogDescription className="text-base">
+                  Ingresa los datos del nuevo usuario del sistema.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="nombre">Nombre *</Label>
+                  <Label htmlFor="nombre" className="text-base font-medium">
+                    Nombre completo
+                  </Label>
                   <Input
                     id="nombre"
-                    placeholder="Ingresa el nombre"
                     value={newUser.nombre}
-                    onChange={(e) => {
-                      const value = handleNameInput(e)
-                      setNewUser((prev) => ({ ...prev, nombre: value }))
-                    }}
-                    className={errors.nombre ? "border-red-500" : ""}
-                    required
+                    onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })}
+                    className="text-base h-12"
                   />
-                  {errors.nombre && <p className="text-sm text-red-500">{errors.nombre}</p>}
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="primerApell">Primer Apellido *</Label>
+                  <Label htmlFor="email" className="text-base font-medium">
+                    Email
+                  </Label>
                   <Input
-                    id="primerApell"
-                    placeholder="Primer apellido"
-                    value={newUser.primerApell}
-                    onChange={(e) => {
-                      const value = handleNameInput(e)
-                      setNewUser((prev) => ({ ...prev, primerApell: value }))
-                    }}
-                    className={errors.primerApell ? "border-red-500" : ""}
-                    required
+                    id="email"
+                    type="email"
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    className="text-base h-12"
                   />
-                  {errors.primerApell && <p className="text-sm text-red-500">{errors.primerApell}</p>}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="segundoApell">Segundo Apellido</Label>
-                <Input
-                  id="segundoApell"
-                  placeholder="Segundo apellido (opcional)"
-                  value={newUser.segundoApell}
-                  onChange={(e) => {
-                    const value = handleNameInput(e)
-                    setNewUser((prev) => ({ ...prev, segundoApell: value }))
-                  }}
-                  className={errors.segundoApell ? "border-red-500" : ""}
-                />
-                {errors.segundoApell && <p className="text-sm text-red-500">{errors.segundoApell}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="correo">Correo Electrónico *</Label>
-                <Input
-                  id="correo"
-                  type="email"
-                  placeholder="correo@ejemplo.com"
-                  value={newUser.correo}
-                  onChange={(e) => setNewUser((prev) => ({ ...prev, correo: e.target.value }))}
-                  className={errors.correo ? "border-red-500" : ""}
-                  required
-                />
-                {errors.correo && <p className="text-sm text-red-500">{errors.correo}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="telefono">Número de Teléfono *</Label>
-                <Input
-                  id="telefono"
-                  placeholder="Número de teléfono"
-                  value={newUser.numTel}
-                  onChange={(e) => {
-                    const value = handlePhoneInput(e)
-                    setNewUser((prev) => ({ ...prev, numTel: value }))
-                  }}
-                  className={errors.numTel ? "border-red-500" : ""}
-                  required
-                />
-                {errors.numTel && <p className="text-sm text-red-500">{errors.numTel}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="rol">Rol *</Label>
-                <Select
-                  value={newUser.idRol.toString()}
-                  onValueChange={(value) => setNewUser((prev) => ({ ...prev, idRol: Number(value) }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((role) => (
-                      <SelectItem key={role._id} value={role._id.toString()}>
-                        {role.nombreRol}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="bg-blue-50 p-3 rounded-md">
-                <p className="text-sm text-blue-800">
-                  <strong>Nota:</strong> La contraseña por defecto será <code>123456789</code>. El usuario deberá
-                  cambiarla en su primer inicio de sesión.
-                </p>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="bg-green-600 hover:bg-green-700">
-                  Crear Usuario
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-            <Users className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Activos</CardTitle>
-            <Users className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactivos</CardTitle>
-            <Users className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.inactive}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Administradores</CardTitle>
-            <Users className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{stats.admins}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuarios Regulares</CardTitle>
-            <Users className="h-4 w-4 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{stats.regularUsers}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Users Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Usuarios ({filteredUsers.length})</CardTitle>
-              <CardDescription>Gestionar cuentas de usuario y sus niveles de acceso</CardDescription>
-            </div>
-          </div>
-
-          {/* Search and Filter */}
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Buscar usuarios..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Todos los roles" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los roles</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role._id} value={role._id.toString()}>
-                    {role.nombreRol}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearchTerm("")
-                setRoleFilter("all")
-              }}
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Limpiar
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead>Contacto</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user._id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <Avatar>
-                        <AvatarFallback className="bg-green-100 text-green-600">
-                          {user.nombre.charAt(0)}
-                          {user.primerApell.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">
-                          {user.nombre} {user.primerApell} {user.segundoApell}
-                        </p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm">{user.correo}</p>
-                      <p className="text-sm text-gray-500">{user.numTel}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={user.estado ? "default" : "destructive"}>
-                      {user.estado ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={getRoleBadgeVariant(user.idRol)}
-                      className={user.idRol === 1 ? "bg-green-100 text-green-800" : ""}
-                    >
-                      {getRoleName(user.idRol)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditUser(user)}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteUser(user._id)} className="text-red-600">
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Eliminar
-                        </DropdownMenuItem>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-orange-600">
-                              <RotateCcw className="w-4 h-4 mr-2" />
-                              Resetear Contraseña
-                            </DropdownMenuItem>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Resetear contraseña?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta acción cambiará la contraseña del usuario a la contraseña por defecto:{" "}
-                                <strong>123456789</strong>
-                                <br />
-                                <br />
-                                El usuario deberá cambiar su contraseña en el próximo inicio de sesión.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleResetPassword(user._id)}
-                                className="bg-orange-600 hover:bg-orange-700"
-                              >
-                                Resetear Contraseña
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Edit User Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Editar Usuario</DialogTitle>
-            <DialogDescription>Modificar la información del usuario seleccionado.</DialogDescription>
-          </DialogHeader>
-          {editingUser && (
-            <form onSubmit={handleUpdateUser} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="editNombre">Nombre *</Label>
+                  <Label htmlFor="password" className="text-base font-medium">
+                    Contraseña
+                  </Label>
                   <Input
-                    id="editNombre"
-                    value={editingUser.nombre}
-                    onChange={(e) => {
-                      const value = handleNameInput(e)
-                      setEditingUser((prev) => (prev ? { ...prev, nombre: value } : null))
-                    }}
-                    className={errors.nombre ? "border-red-500" : ""}
-                    required
+                    id="password"
+                    type="password"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    className="text-base h-12"
                   />
-                  {errors.nombre && <p className="text-sm text-red-500">{errors.nombre}</p>}
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="editPrimerApell">Primer Apellido *</Label>
-                  <Input
-                    id="editPrimerApell"
-                    value={editingUser.primerApell}
-                    onChange={(e) => {
-                      const value = handleNameInput(e)
-                      setEditingUser((prev) => (prev ? { ...prev, primerApell: value } : null))
-                    }}
-                    className={errors.primerApell ? "border-red-500" : ""}
-                    required
-                  />
-                  {errors.primerApell && <p className="text-sm text-red-500">{errors.primerApell}</p>}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="editSegundoApell">Segundo Apellido</Label>
-                <Input
-                  id="editSegundoApell"
-                  value={editingUser.segundoApell}
-                  onChange={(e) => {
-                    const value = handleNameInput(e)
-                    setEditingUser((prev) => (prev ? { ...prev, segundoApell: value } : null))
-                  }}
-                  className={errors.segundoApell ? "border-red-500" : ""}
-                />
-                {errors.segundoApell && <p className="text-sm text-red-500">{errors.segundoApell}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="editTelefono">Número de Teléfono *</Label>
-                <Input
-                  id="editTelefono"
-                  value={editingUser.numTel}
-                  onChange={(e) => {
-                    const value = handlePhoneInput(e)
-                    setEditingUser((prev) => (prev ? { ...prev, numTel: value } : null))
-                  }}
-                  className={errors.numTel ? "border-red-500" : ""}
-                  required
-                />
-                {errors.numTel && <p className="text-sm text-red-500">{errors.numTel}</p>}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="editEstado">Estado</Label>
-                  <Select
-                    value={editingUser.estado.toString()}
-                    onValueChange={(value) =>
-                      setEditingUser((prev) => (prev ? { ...prev, estado: value === "true" } : null))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Activo</SelectItem>
-                      <SelectItem value="false">Inactivo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="editRol">Rol *</Label>
-                  <Select
-                    value={editingUser.idRol.toString()}
-                    onValueChange={(value) =>
-                      setEditingUser((prev) => (prev ? { ...prev, idRol: Number(value) } : null))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
+                  <Label htmlFor="rol" className="text-base font-medium">
+                    Rol
+                  </Label>
+                  <Select value={newUser.rol} onValueChange={(value) => setNewUser({ ...newUser, rol: value })}>
+                    <SelectTrigger className="text-base h-12">
+                      <SelectValue placeholder="Selecciona un rol" />
                     </SelectTrigger>
                     <SelectContent>
                       {roles.map((role) => (
-                        <SelectItem key={role._id} value={role._id.toString()}>
-                          {role.nombreRol}
+                        <SelectItem key={role._id} value={role.nombre}>
+                          {role.nombre}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-
-              <div className="bg-gray-50 p-3 rounded-md">
-                <p className="text-sm text-gray-600">
-                  <strong>Nota:</strong> El correo electrónico no se puede modificar desde aquí. Para cambiar la
-                  contraseña, usa la opción "Resetear Contraseña" en el menú de acciones.
-                </p>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="bg-green-600 hover:bg-green-700">
-                  Actualizar Usuario
-                </Button>
+                <Button onClick={handleCreateUser}>Crear Usuario</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card className="shadow-lg border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-lg font-semibold">Total Usuarios</CardTitle>
+              <Users className="h-6 w-6 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-blue-600 mb-2">{users.length}</div>
+              <p className="text-sm text-muted-foreground">Usuarios registrados</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-lg font-semibold">Administradores</CardTitle>
+              <Shield className="h-6 w-6 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-red-600 mb-2">
+                {users.filter((user) => user.rol.toLowerCase() === "admin").length}
               </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+              <p className="text-sm text-muted-foreground">Con permisos completos</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-lg font-semibold">Usuarios Activos</CardTitle>
+              {/* Placeholder for User icon */}
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-600 mb-2">{users.filter((user) => user.activo).length}</div>
+              <p className="text-sm text-muted-foreground">Cuentas habilitadas</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-lg font-semibold">Roles</CardTitle>
+              {/* Placeholder for Shield icon */}
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-600 mb-2">{roles.length}</div>
+              <p className="text-sm text-muted-foreground">Roles configurados</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters and Search */}
+        <Card className="shadow-lg border-0">
+          <CardHeader className="pb-6">
+            <CardTitle className="text-xl">Filtros y Búsqueda</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                  <Input
+                    placeholder="Buscar por nombre o email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 text-base h-12"
+                  />
+                </div>
+              </div>
+              <div className="w-full md:w-48">
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="text-base h-12">
+                    <SelectValue placeholder="Filtrar por rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los roles</SelectItem>
+                    {roles.map((role) => (
+                      <SelectItem key={role._id} value={role.nombre}>
+                        {role.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Users Table */}
+        <Card className="shadow-lg border-0">
+          <CardHeader className="pb-6">
+            <CardTitle className="text-2xl">Lista de Usuarios</CardTitle>
+            <CardDescription className="text-base">
+              {filteredUsers.length} usuario{filteredUsers.length !== 1 ? "s" : ""} encontrado
+              {filteredUsers.length !== 1 ? "s" : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-base font-semibold">Usuario</TableHead>
+                    <TableHead className="text-base font-semibold">Email</TableHead>
+                    <TableHead className="text-base font-semibold">Rol</TableHead>
+                    <TableHead className="text-base font-semibold">Fecha Creación</TableHead>
+                    <TableHead className="text-base font-semibold">Estado</TableHead>
+                    <TableHead className="text-base font-semibold">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => (
+                    <TableRow key={user._id} className="hover:bg-gray-50">
+                      <TableCell className="font-medium text-base">{user.nombre}</TableCell>
+                      <TableCell className="text-base">{user.email}</TableCell>
+                      <TableCell>
+                        <Badge className={`${getRoleBadgeColor(user.rol)} text-sm px-3 py-1`}>{user.rol}</Badge>
+                      </TableCell>
+                      <TableCell className="text-base">{formatDate(user.fechaCreacion)}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.activo ? "default" : "secondary"} className="text-sm px-3 py-1">
+                          {user.activo ? "Activo" : "Inactivo"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => openEditDialog(user)} className="h-9 px-3">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-9 px-3 bg-transparent">
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-xl">Restablecer Contraseña</AlertDialogTitle>
+                                <AlertDialogDescription className="text-base">
+                                  ¿Estás seguro de que quieres restablecer la contraseña de {user.nombre}? Se generará
+                                  una nueva contraseña temporal.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleResetPassword(user._id)}>
+                                  Restablecer
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-9 px-3 text-red-600 hover:text-red-700 bg-transparent"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-xl">Eliminar Usuario</AlertDialogTitle>
+                                <AlertDialogDescription className="text-base">
+                                  ¿Estás seguro de que quieres eliminar a {user.nombre}? Esta acción no se puede
+                                  deshacer.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteUser(user._id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Eliminar
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Edit User Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl">Editar Usuario</DialogTitle>
+              <DialogDescription className="text-base">Modifica los datos del usuario seleccionado.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-nombre" className="text-base font-medium">
+                  Nombre completo
+                </Label>
+                <Input
+                  id="edit-nombre"
+                  value={editUser.nombre}
+                  onChange={(e) => setEditUser({ ...editUser, nombre: e.target.value })}
+                  className="text-base h-12"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email" className="text-base font-medium">
+                  Email
+                </Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editUser.email}
+                  onChange={(e) => setEditUser({ ...editUser, email: e.target.value })}
+                  className="text-base h-12"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-rol" className="text-base font-medium">
+                  Rol
+                </Label>
+                <Select value={editUser.rol} onValueChange={(value) => setEditUser({ ...editUser, rol: value })}>
+                  <SelectTrigger className="text-base h-12">
+                    <SelectValue placeholder="Selecciona un rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role._id} value={role.nombre}>
+                        {role.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditUser}>Guardar Cambios</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   )
 }
