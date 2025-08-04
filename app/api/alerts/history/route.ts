@@ -1,32 +1,41 @@
 import { NextResponse } from "next/server"
-import { connectToDatabase } from "@/lib/mongodb"
+import connectDB from "@/lib/mongodb"
 import AlerActuadores from "@/models/AlerActuadores"
 import Componentes from "@/models/Componentes"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
-    await connectToDatabase()
+    await connectDB()
 
     // Obtener todas las alertas de actuadores
-    const actuatorAlerts = await AlerActuadores.find({}).sort({ fechaRegistro: -1 }).lean()
+    const alertas = await AlerActuadores.find({
+      idInfoIncubadora: 1,
+    })
+      .sort({ fechaRegistro: -1 })
+      .lean()
 
-    // Obtener todos los componentes para mapear nombres
-    const componentes = await Componentes.find({}).lean()
-    const componentesMap = new Map(componentes.map((comp) => [comp._id, comp.nombreComponente]))
+    // Obtener información de componentes para mapear nombres
+    const componentes = await Componentes.find().lean()
+    const componentesMap = new Map()
+    componentes.forEach((comp) => {
+      componentesMap.set(comp._id.toString(), comp.nombreComponente)
+    })
 
-    // Mapear las alertas con nombres de componentes
-    const alertsWithNames = actuatorAlerts.map((alert) => ({
-      _id: alert._id.toString(),
-      fechaRegistro: alert.fechaRegistro,
-      idActuador: alert.idActuador,
-      nombreActuador: componentesMap.get(alert.idActuador) || `Actuador ${alert.idActuador}`,
-      tipo: "warning" as const,
-      mensaje: `Actuador ${componentesMap.get(alert.idActuador) || alert.idActuador} activado`,
+    // Mapear alertas con información de componentes
+    const alertasFormateadas = alertas.map((alerta) => ({
+      _id: alerta._id.toString(),
+      fechaRegistro: alerta.fechaRegistro,
+      idActuador: alerta.idComponente,
+      nombreActuador: componentesMap.get(alerta.idComponente?.toString()) || `Actuador ${alerta.idComponente}`,
+      tipo: "warning",
+      mensaje: `Activación del ${componentesMap.get(alerta.idComponente?.toString()) || `Actuador ${alerta.idComponente}`}`,
     }))
 
-    return NextResponse.json(alertsWithNames)
+    return NextResponse.json(alertasFormateadas)
   } catch (error) {
-    console.error("Error fetching actuator alerts:", error)
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+    console.error("Error al obtener historial de alertas:", error)
+    return NextResponse.json({ error: "Error al obtener historial de alertas" }, { status: 500 })
   }
 }

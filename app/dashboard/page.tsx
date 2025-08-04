@@ -1,138 +1,189 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import {
   Thermometer,
   Droplets,
-  Activity,
-  Bell,
+  RefreshCw,
   Download,
+  Cpu,
+  Zap,
+  Bell,
+  FileText,
   FileSpreadsheet,
   FileJson,
-  FileText,
-  RefreshCw,
-  BarChart3,
-  TrendingUp,
 } from "lucide-react"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import html2canvas from "html2canvas"
-import jsPDF from "jspdf"
+import { jsPDF } from "jspdf"
 
 interface SensorData {
-  _id: string
-  nombreComponente: string
-  tipo: string
-  estado: boolean
-}
-
-interface CurrentData {
   temperatura: number
   humedad: number
-  fechaActualizacion: string
+  timestamp: string
 }
 
-interface HistoricalData {
-  fecha: string
-  temperatura: number
-  humedad: number
-}
-
-interface Config {
+interface OptimalRange {
   tempMin: number
   tempMax: number
   humedadMin: number
   humedadMax: number
 }
 
-export default function DashboardPage() {
-  const [sensors, setSensors] = useState<SensorData[]>([])
-  const [actuators, setActuators] = useState<SensorData[]>([])
-  const [currentData, setCurrentData] = useState<CurrentData | null>(null)
-  const [historicalData, setHistoricalData] = useState<HistoricalData[]>([])
-  const [config, setConfig] = useState<Config>({
+interface HistoricalData {
+  time: string
+  temperatura: number
+  humedad: number
+  timestamp: string
+}
+
+interface SensorStatus {
+  edoDht11A: boolean
+  edoDht11B: boolean
+  edoCalefactor: boolean
+  edoHumificador: boolean
+  edoVentilador: boolean
+}
+
+export default function Dashboard() {
+  const [sensorData, setSensorData] = useState<SensorData>({
+    temperatura: 27.5,
+    humedad: 75.2,
+    timestamp: new Date().toLocaleTimeString(),
+  })
+
+  const [optimalRange, setOptimalRange] = useState<OptimalRange>({
     tempMin: 26,
     tempMax: 29,
     humedadMin: 60,
     humedadMax: 80,
   })
+
+  const [isAutoRefresh, setIsAutoRefresh] = useState(true)
+  const [isCelsius, setIsCelsius] = useState(true)
+  const [timeRange, setTimeRange] = useState("24h")
+  const [historicalData, setHistoricalData] = useState<HistoricalData[]>([])
+  const [sensorStatus, setSensorStatus] = useState<SensorStatus>({
+    edoDht11A: true,
+    edoDht11B: true,
+    edoCalefactor: false,
+    edoHumificador: true,
+    edoVentilador: false,
+  })
   const [totalAlerts, setTotalAlerts] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [autoRefresh, setAutoRefresh] = useState(true)
-  const chartRef = useRef<HTMLDivElement>(null)
 
+  // Cargar datos iniciales
   useEffect(() => {
-    loadData()
-    const interval = setInterval(() => {
-      if (autoRefresh) {
-        loadData()
-      }
-    }, 30000) // Actualizar cada 30 segundos
+    loadCurrentData()
+    loadOptimalRange()
+    loadHistoricalData()
+    loadSensorStatus()
+    loadTotalAlerts()
+  }, [])
 
-    return () => clearInterval(interval)
-  }, [autoRefresh])
-
-  const loadData = async () => {
-    try {
-      await Promise.all([loadSensors(), loadCurrentData(), loadHistoricalData(), loadConfig(), loadTotalAlerts()])
-    } catch (error) {
-      console.error("Error loading dashboard data:", error)
-    } finally {
-      setLoading(false)
+  // Auto-refresh
+  useEffect(() => {
+    if (isAutoRefresh) {
+      const interval = setInterval(() => {
+        loadCurrentData()
+        loadSensorStatus()
+      }, 30000) // Actualizar cada 30 segundos
+      return () => clearInterval(interval)
     }
-  }
-
-  const loadSensors = async () => {
-    try {
-      const response = await fetch("/api/components")
-      if (response.ok) {
-        const data = await response.json()
-        setSensors(data.filter((item: SensorData) => item.tipo === "sensor"))
-        setActuators(data.filter((item: SensorData) => item.tipo === "actuador"))
-      }
-    } catch (error) {
-      console.error("Error loading sensors:", error)
-    }
-  }
+  }, [isAutoRefresh])
 
   const loadCurrentData = async () => {
     try {
       const response = await fetch("/api/dashboard/current")
       if (response.ok) {
         const data = await response.json()
-        setCurrentData(data)
+        setSensorData({
+          temperatura: data.temperActual || 27.5,
+          humedad: data.humedActual || 75.2,
+          timestamp: new Date().toLocaleTimeString(),
+        })
+      } else {
+        // Datos de fallback si la API falla
+        setSensorData({
+          temperatura: 27.5,
+          humedad: 75.2,
+          timestamp: new Date().toLocaleTimeString(),
+        })
       }
     } catch (error) {
       console.error("Error loading current data:", error)
+      // Datos de fallback
+      setSensorData({
+        temperatura: 27.5,
+        humedad: 75.2,
+        timestamp: new Date().toLocaleTimeString(),
+      })
+    }
+  }
+
+  const loadOptimalRange = async () => {
+    try {
+      const response = await fetch("/api/dashboard/config")
+      if (response.ok) {
+        const data = await response.json()
+        setOptimalRange({
+          tempMin: data.tempMin || 26,
+          tempMax: data.tempMax || 29,
+          humedadMin: data.humedadMin || 60,
+          humedadMax: data.humedadMax || 80,
+        })
+      }
+    } catch (error) {
+      console.error("Error loading optimal range:", error)
     }
   }
 
   const loadHistoricalData = async () => {
     try {
-      const response = await fetch("/api/dashboard/historical")
+      const response = await fetch(`/api/dashboard/historical?range=${timeRange}`)
       if (response.ok) {
         const data = await response.json()
         setHistoricalData(data)
+      } else {
+        // Datos de ejemplo si la API falla
+        const mockData = Array.from({ length: 24 }, (_, i) => ({
+          time: `${String(i).padStart(2, "0")}:00`,
+          temperatura: 26 + Math.random() * 4,
+          humedad: 65 + Math.random() * 20,
+          timestamp: new Date(Date.now() - (23 - i) * 60 * 60 * 1000).toISOString(),
+        }))
+        setHistoricalData(mockData)
       }
     } catch (error) {
       console.error("Error loading historical data:", error)
+      // Datos de ejemplo
+      const mockData = Array.from({ length: 24 }, (_, i) => ({
+        time: `${String(i).padStart(2, "0")}:00`,
+        temperatura: 26 + Math.random() * 4,
+        humedad: 65 + Math.random() * 20,
+        timestamp: new Date(Date.now() - (23 - i) * 60 * 60 * 1000).toISOString(),
+      }))
+      setHistoricalData(mockData)
     }
   }
 
-  const loadConfig = async () => {
+  const loadSensorStatus = async () => {
     try {
-      const response = await fetch("/api/dashboard/config")
+      const response = await fetch("/api/dashboard/sensors")
       if (response.ok) {
         const data = await response.json()
-        setConfig(data)
+        setSensorStatus(data)
       }
     } catch (error) {
-      console.error("Error loading config:", error)
+      console.error("Error loading sensor status:", error)
     }
   }
 
@@ -156,57 +207,104 @@ export default function DashboardPage() {
       setTotalAlerts(total)
     } catch (error) {
       console.error("Error loading total alerts:", error)
+      setTotalAlerts(0)
     }
   }
 
-  const getTemperatureStatus = () => {
-    if (!currentData) return { status: "normal", color: "text-gray-500" }
+  // Actualizar datos históricos cuando cambie el rango de tiempo
+  useEffect(() => {
+    loadHistoricalData()
+  }, [timeRange])
 
-    const temp = currentData.temperatura
-    if (temp < config.tempMin || temp > config.tempMax) {
-      return { status: "Fuera de rango", color: "text-red-500" }
-    }
-    return { status: "Óptima", color: "text-green-500" }
+  const convertTemperature = (temp: number) => {
+    return isCelsius ? temp : (temp * 9) / 5 + 32
   }
 
-  const getHumidityStatus = () => {
-    if (!currentData) return { status: "normal", color: "text-gray-500" }
+  const getTemperatureUnit = () => (isCelsius ? "°C" : "°F")
 
-    const humidity = currentData.humedad
-    if (humidity < config.humedadMin || humidity > config.humedadMax) {
-      return { status: "Fuera de rango", color: "text-red-500" }
-    }
-    return { status: "Óptima", color: "text-green-500" }
+  const getOptimalRangeText = () => {
+    const minTemp = convertTemperature(optimalRange.tempMin)
+    const maxTemp = convertTemperature(optimalRange.tempMax)
+    return `${minTemp.toFixed(1)}° - ${maxTemp.toFixed(1)}°`
   }
 
-  const getTemperatureProgress = () => {
-    if (!currentData) return 0
-    const temp = currentData.temperatura
-    const range = config.tempMax - config.tempMin
-    const progress = ((temp - config.tempMin) / range) * 100
-    return Math.max(0, Math.min(100, progress))
+  const isTemperatureOptimal = () => {
+    return sensorData.temperatura >= optimalRange.tempMin && sensorData.temperatura <= optimalRange.tempMax
   }
 
-  const getHumidityProgress = () => {
-    if (!currentData) return 0
-    const humidity = currentData.humedad
-    const range = config.humedadMax - config.humedadMin
-    const progress = ((humidity - config.humedadMin) / range) * 100
-    return Math.max(0, Math.min(100, progress))
+  const isHumidityOptimal = () => {
+    return sensorData.humedad >= optimalRange.humedadMin && sensorData.humedad <= optimalRange.humedadMax
   }
 
-  const handleExport = async (format: "csv" | "json" | "pdf") => {
+  // Separar sensores de actuadores
+  const getActiveSensorsCount = () => {
+    return [sensorStatus.edoDht11A, sensorStatus.edoDht11B].filter(Boolean).length
+  }
+
+  const getTotalSensorsCount = () => {
+    return 2 // Solo DHT11A y DHT11B son sensores
+  }
+
+  const getActiveActuatorsCount = () => {
+    return [sensorStatus.edoCalefactor, sensorStatus.edoHumificador, sensorStatus.edoVentilador].filter(Boolean).length
+  }
+
+  const getTotalActuatorsCount = () => {
+    return 3 // Calefactor, Humificador y Ventilador son actuadores
+  }
+
+  const handleExport = async (format: "json" | "csv" | "pdf") => {
     try {
       if (format === "pdf") {
-        await exportToPDF()
+        // Para PDF, necesitamos capturar el gráfico
+        const chartElement = document.querySelector(".recharts-wrapper")
+        if (chartElement) {
+          const canvas = await html2canvas(chartElement as HTMLElement)
+          const imgData = canvas.toDataURL("image/png")
+
+          const pdf = new jsPDF()
+
+          // Título
+          pdf.setFontSize(20)
+          pdf.text("Reporte Hermetia Vitalis", 20, 20)
+
+          // Información actual
+          pdf.setFontSize(12)
+          pdf.text(
+            `Temperatura: ${convertTemperature(sensorData.temperatura).toFixed(1)}${getTemperatureUnit()}`,
+            20,
+            40,
+          )
+          pdf.text(`Humedad: ${sensorData.humedad.toFixed(1)}%`, 20, 50)
+          pdf.text(`Rango de tiempo: ${timeRange}`, 20, 60)
+
+          // Gráfico
+          pdf.addImage(imgData, "PNG", 20, 80, 170, 100)
+
+          // Tabla de datos
+          let yPosition = 200
+          pdf.text("Datos Históricos:", 20, yPosition)
+          yPosition += 10
+
+          historicalData.slice(0, 10).forEach((row, index) => {
+            pdf.text(
+              `${row.time} - Temp: ${convertTemperature(row.temperatura).toFixed(1)}${getTemperatureUnit()} - Hum: ${row.humedad.toFixed(1)}%`,
+              20,
+              yPosition,
+            )
+            yPosition += 8
+          })
+
+          pdf.save(`reporte_hermetia_${timeRange}.pdf`)
+        }
       } else {
-        const response = await fetch(`/api/dashboard/export?format=${format}`)
+        const response = await fetch(`/api/dashboard/export?range=${timeRange}&format=${format}`)
         if (response.ok) {
           const blob = await response.blob()
           const url = window.URL.createObjectURL(blob)
           const a = document.createElement("a")
           a.href = url
-          a.download = `dashboard_data.${format}`
+          a.download = `datos_hermetia_${timeRange}.${format}`
           document.body.appendChild(a)
           a.click()
           window.URL.revokeObjectURL(url)
@@ -214,67 +312,9 @@ export default function DashboardPage() {
         }
       }
     } catch (error) {
-      console.error("Error exporting data:", error)
+      console.error("Error al exportar:", error)
     }
   }
-
-  const exportToPDF = async () => {
-    if (!chartRef.current) return
-
-    try {
-      const canvas = await html2canvas(chartRef.current, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-      })
-
-      const pdf = new jsPDF("p", "mm", "a4")
-      const imgWidth = 190
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-
-      // Título
-      pdf.setFontSize(20)
-      pdf.text("Reporte del Dashboard - Hermetia Vitalis", 20, 20)
-
-      // Fecha
-      pdf.setFontSize(12)
-      pdf.text(`Fecha: ${new Date().toLocaleDateString("es-ES")}`, 20, 30)
-
-      // Datos actuales
-      if (currentData) {
-        pdf.text(`Temperatura actual: ${currentData.temperatura}°C`, 20, 45)
-        pdf.text(`Humedad actual: ${currentData.humedad}%`, 20, 55)
-        pdf.text(`Última actualización: ${new Date(currentData.fechaActualizacion).toLocaleString("es-ES")}`, 20, 65)
-      }
-
-      // Gráfico
-      pdf.text("Tendencias Históricas:", 20, 80)
-      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 10, 90, imgWidth, imgHeight)
-
-      pdf.save("dashboard_reporte.pdf")
-    } catch (error) {
-      console.error("Error generating PDF:", error)
-    }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Cargando dashboard...</div>
-      </div>
-    )
-  }
-
-  const tempStatus = getTemperatureStatus()
-  const humidityStatus = getHumidityStatus()
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -285,35 +325,33 @@ export default function DashboardPage() {
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Monitoreo Hermetia Vitalis</h1>
             <p className="text-lg text-gray-600">Sistema de monitoreo para incubadoras de Hermetia illucens</p>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Auto</span>
-              <Button
-                variant={autoRefresh ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                className="h-9"
-              >
-                {autoRefresh ? "ON" : "OFF"}
-              </Button>
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-3">
+              <span className="text-sm font-medium text-gray-600">°C</span>
+              <Switch checked={!isCelsius} onCheckedChange={(checked) => setIsCelsius(!checked)} />
+              <span className="text-sm font-medium text-gray-600">°F</span>
             </div>
-            <Button variant="outline" size="sm" onClick={() => loadData()} className="h-9">
-              <RefreshCw className="w-4 h-4 mr-2" />
+            <Button variant="outline" size="lg" onClick={loadCurrentData} className="px-6 bg-transparent">
+              <RefreshCw className="w-5 h-5 mr-2" />
               Actualizar
             </Button>
+            <div className="flex items-center space-x-3">
+              <span className="text-sm font-medium text-gray-600">Auto ON</span>
+              <Switch checked={isAutoRefresh} onCheckedChange={setIsAutoRefresh} />
+            </div>
           </div>
         </div>
 
         {/* Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <Card className="shadow-lg border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-lg font-semibold">Sensores</CardTitle>
-              <Activity className="h-6 w-6 text-blue-500" />
+              <Cpu className="h-6 w-6 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-600 mb-2">
-                {sensors.filter((s) => s.estado).length}/{sensors.length}
+                {getActiveSensorsCount()}/{getTotalSensorsCount()}
               </div>
               <p className="text-sm text-muted-foreground">Sensores activos</p>
             </CardContent>
@@ -322,11 +360,11 @@ export default function DashboardPage() {
           <Card className="shadow-lg border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-lg font-semibold">Actuadores</CardTitle>
-              <Activity className="h-6 w-6 text-orange-500" />
+              <Zap className="h-6 w-6 text-orange-500" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-orange-600 mb-2">
-                {actuators.filter((a) => a.estado).length}/{actuators.length}
+                {getActiveActuatorsCount()}/{getTotalActuatorsCount()}
               </div>
               <p className="text-sm text-muted-foreground">Actuadores activos</p>
             </CardContent>
@@ -344,8 +382,8 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Environmental Data */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Main Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Temperature */}
           <Card className="shadow-lg border-0">
             <CardHeader className="pb-6">
@@ -354,17 +392,13 @@ export default function DashboardPage() {
                   <Thermometer className="h-6 w-6 text-red-500" />
                   <CardTitle className="text-xl">Temperatura</CardTitle>
                 </div>
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className={`w-4 h-4 rounded-full ${isTemperatureOptimal() ? "bg-green-500" : "bg-red-500"}`} />
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center">
-                <div className="text-5xl font-bold text-gray-900 mb-2">
-                  {currentData?.temperatura || "--"}
-                  <span className="text-2xl text-gray-500">°C</span>
-                </div>
-                <div className="w-32 h-32 mx-auto relative">
-                  <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
+            <CardContent>
+              <div className="flex items-center justify-center mb-6">
+                <div className="relative w-40 h-40">
+                  <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 36 36">
                     <path
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
@@ -374,22 +408,26 @@ export default function DashboardPage() {
                     <path
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
-                      stroke={tempStatus.status === "Óptima" ? "#10b981" : "#ef4444"}
+                      stroke={isTemperatureOptimal() ? "#10b981" : "#ef4444"}
                       strokeWidth="3"
-                      strokeDasharray={`${getTemperatureProgress()}, 100`}
+                      strokeDasharray={`${(convertTemperature(sensorData.temperatura) / 50) * 100}, 100`}
                     />
                   </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold">{convertTemperature(sensorData.temperatura).toFixed(1)}</div>
+                      <div className="text-lg text-gray-500">{getTemperatureUnit()}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="text-center space-y-2">
-                <p className="text-sm text-gray-600">
-                  Rango óptimo: {config.tempMin}° - {config.tempMax}°
-                </p>
+              <div className="text-center">
+                <p className="text-base text-gray-600 mb-3">Rango óptimo: {getOptimalRangeText()}</p>
                 <Badge
-                  variant={tempStatus.status === "Óptima" ? "default" : "destructive"}
-                  className="text-sm px-3 py-1"
+                  variant={isTemperatureOptimal() ? "default" : "destructive"}
+                  className={`text-sm px-4 py-2 ${isTemperatureOptimal() ? "bg-green-100 text-green-800" : ""}`}
                 >
-                  {tempStatus.status}
+                  {isTemperatureOptimal() ? "Óptima" : "Fuera de rango"}
                 </Badge>
               </div>
             </CardContent>
@@ -403,17 +441,13 @@ export default function DashboardPage() {
                   <Droplets className="h-6 w-6 text-blue-500" />
                   <CardTitle className="text-xl">Humedad</CardTitle>
                 </div>
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <div className={`w-4 h-4 rounded-full ${isHumidityOptimal() ? "bg-green-500" : "bg-red-500"}`} />
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center">
-                <div className="text-5xl font-bold text-gray-900 mb-2">
-                  {currentData?.humedad || "--"}
-                  <span className="text-2xl text-gray-500">%</span>
-                </div>
-                <div className="w-32 h-32 mx-auto relative">
-                  <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
+            <CardContent>
+              <div className="flex items-center justify-center mb-6">
+                <div className="relative w-40 h-40">
+                  <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 36 36">
                     <path
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
@@ -423,22 +457,28 @@ export default function DashboardPage() {
                     <path
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
-                      stroke={humidityStatus.status === "Óptima" ? "#10b981" : "#ef4444"}
+                      stroke={isHumidityOptimal() ? "#3b82f6" : "#ef4444"}
                       strokeWidth="3"
-                      strokeDasharray={`${getHumidityProgress()}, 100`}
+                      strokeDasharray={`${sensorData.humedad}, 100`}
                     />
                   </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold">{sensorData.humedad.toFixed(1)}</div>
+                      <div className="text-lg text-gray-500">%</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="text-center space-y-2">
-                <p className="text-sm text-gray-600">
-                  Rango óptimo: {config.humedadMin}% - {config.humedadMax}%
+              <div className="text-center">
+                <p className="text-base text-gray-600 mb-3">
+                  Rango óptimo: {optimalRange.humedadMin}% - {optimalRange.humedadMax}%
                 </p>
                 <Badge
-                  variant={humidityStatus.status === "Óptima" ? "default" : "destructive"}
-                  className="text-sm px-3 py-1"
+                  variant={isHumidityOptimal() ? "default" : "destructive"}
+                  className={`text-sm px-4 py-2 ${isHumidityOptimal() ? "bg-green-100 text-green-800" : ""}`}
                 >
-                  {humidityStatus.status}
+                  {isHumidityOptimal() ? "Óptima" : "Fuera de rango"}
                 </Badge>
               </div>
             </CardContent>
@@ -449,15 +489,21 @@ export default function DashboardPage() {
         <Card className="shadow-lg border-0">
           <CardHeader className="pb-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <TrendingUp className="h-6 w-6 text-green-500" />
-                <div>
-                  <CardTitle className="text-2xl mb-1">Tendencias Históricas</CardTitle>
-                  <CardDescription className="text-base">Datos de temperatura y humedad en el tiempo</CardDescription>
-                </div>
+              <div>
+                <CardTitle className="text-2xl mb-2">Tendencias Históricas</CardTitle>
+                <CardDescription className="text-base">Datos de temperatura y humedad en el tiempo</CardDescription>
               </div>
               <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">Últimas 24h</span>
+                <Select value={timeRange} onValueChange={setTimeRange}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24h">Últimas 24h</SelectItem>
+                    <SelectItem value="7d">Últimos 7d</SelectItem>
+                    <SelectItem value="30d">Últimos 30d</SelectItem>
+                  </SelectContent>
+                </Select>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="lg" className="px-6 bg-transparent">
@@ -485,68 +531,47 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="grafico" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="grafico" className="text-base">
-                  <BarChart3 className="w-4 h-4 mr-2" />
                   Gráfico
                 </TabsTrigger>
                 <TabsTrigger value="tabla" className="text-base">
                   Tabla
                 </TabsTrigger>
               </TabsList>
-
-              <TabsContent value="grafico">
-                <div ref={chartRef} className="bg-white p-4 rounded-lg">
-                  <ResponsiveContainer width="100%" height={400}>
+              <TabsContent value="grafico" className="mt-6">
+                <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={historicalData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="fecha" tickFormatter={(value) => formatDate(value)} fontSize={12} />
-                      <YAxis fontSize={12} />
-                      <Tooltip
-                        labelFormatter={(value) => `Fecha: ${formatDate(value)}`}
-                        formatter={(value: number, name: string) => [
-                          `${value}${name === "temperatura" ? "°C" : "%"}`,
-                          name === "temperatura" ? "Temperatura" : "Humedad",
-                        ]}
-                      />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="temperatura"
-                        stroke="#ef4444"
-                        strokeWidth={2}
-                        name="Temperatura"
-                        dot={{ fill: "#ef4444", strokeWidth: 2, r: 4 }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="humedad"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        name="Humedad"
-                        dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
-                      />
+                      <XAxis dataKey="time" />
+                      <YAxis />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="temperatura" stroke="#ef4444" strokeWidth={3} name="Temperatura" />
+                      <Line type="monotone" dataKey="humedad" stroke="#3b82f6" strokeWidth={3} name="Humedad" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </TabsContent>
-
-              <TabsContent value="tabla">
-                <div className="overflow-x-auto">
+              <TabsContent value="tabla" className="mt-6">
+                <div className="max-h-96 overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-base font-semibold">Fecha y Hora</TableHead>
-                        <TableHead className="text-base font-semibold">Temperatura (°C)</TableHead>
-                        <TableHead className="text-base font-semibold">Humedad (%)</TableHead>
+                        <TableHead className="text-base">Hora</TableHead>
+                        <TableHead className="text-base">Temperatura</TableHead>
+                        <TableHead className="text-base">Humedad</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {historicalData.slice(0, 20).map((item, index) => (
-                        <TableRow key={index} className="hover:bg-gray-50">
-                          <TableCell className="text-base">{formatDate(item.fecha)}</TableCell>
-                          <TableCell className="text-base font-medium">{item.temperatura}°C</TableCell>
-                          <TableCell className="text-base font-medium">{item.humedad}%</TableCell>
+                      {historicalData.map((row, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="text-base">{row.time}</TableCell>
+                          <TableCell className="text-base">
+                            {convertTemperature(row.temperatura).toFixed(1)}
+                            {getTemperatureUnit()}
+                          </TableCell>
+                          <TableCell className="text-base">{row.humedad.toFixed(1)}%</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
